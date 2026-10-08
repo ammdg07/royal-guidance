@@ -1,22 +1,35 @@
 import { useState } from "react";
-import { Send, FileText, MessageCircle, Copy, Download, Sparkles } from "lucide-react";
+import { Send, FileText, MessageCircle, Copy, Download, Sparkles, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 type ChatMode = "consultation" | "letter";
+
+interface LetterData {
+  addressee: string;
+  subject: string;
+  greeting: string;
+  body: string[];
+  closing: string;
+  sender_label: string;
+  notes?: string;
+}
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   type: "text" | "letter";
+  letter?: LetterData;
 }
 
 const mockMessages: Message[] = [
   {
     id: "1",
     role: "assistant",
-    content: "السلام عليكم ورحمة الله وبركاته،\n\nأنا مستشارك الحكومي المتخصص. كيف يمكنني خدمتكم اليوم؟\n\nيمكنكم الاختيار بين:\n• **الاستشارة**: للاستفسار عن الإجراءات والأنظمة الحكومية\n• **صياغة خطاب**: لإعداد المعاريض والخطابات الرسمية",
+    content:
+      "السلام عليكم ورحمة الله وبركاته،\n\nأنا مستشارك الحكومي المتخصص. كيف يمكنني خدمتكم اليوم؟\n\nيمكنكم الاختيار بين:\n• الاستشارة: للاستفسار عن الإجراءات والأنظمة الحكومية\n• صياغة خطاب: لإعداد المعاريض والخطابات الرسمية",
     type: "text",
   },
 ];
@@ -27,34 +40,75 @@ export function ChatInterface() {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const handleSend = async () => {
+    if (!input.trim() || isTyping) return;
 
-    const newMessage: Message = {
+    const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
       content: input,
       type: "text",
     };
 
-    setMessages((prev) => [...prev, newMessage]);
+    const history = [...messages, userMessage];
+    setMessages(history);
     setInput("");
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const response: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content:
-          mode === "letter"
-            ? "سأقوم بإعداد الخطاب المطلوب. يرجى تزويدي بالمعلومات التالية:\n\n• الجهة المرسل إليها\n• موضوع الخطاب\n• الاسم الكامل\n• رقم الهوية\n• رقم الجوال"
-            : "بناءً على استفساركم، وبعد البحث في المصادر الرسمية:\n\n**النتيجة:**\nيمكنكم تقديم طلبكم عبر منصة أبشر الإلكترونية.\n\n**المصدر:**\n[absher.sa](https://absher.sa)",
-        type: mode === "letter" ? "letter" : "text",
-      };
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-chat", {
+        body: {
+          mode,
+          messages: history
+            .filter((m) => m.id !== mockMessages[0].id)
+            .map((m) => ({ role: m.role, content: m.content })),
+        },
+      });
+
+      if (error) throw error;
+
+      const response: Message =
+        data?.type === "letter"
+          ? {
+              id: (Date.now() + 1).toString(),
+              role: "assistant",
+              content: data.letter?.subject ?? "خطاب رسمي",
+              type: "letter",
+              letter: data.letter,
+            }
+          : {
+              id: (Date.now() + 1).toString(),
+              role: "assistant",
+              content: data?.content ?? "تعذّر الحصول على رد. حاول مرة أخرى.",
+              type: "text",
+            };
+
       setMessages((prev) => [...prev, response]);
+    } catch (err: any) {
+      const serverError = err?.context ? undefined : undefined;
+      let errorText = "حدث خطأ أثناء الاتصال بالخدمة. حاول مرة أخرى.";
+      try {
+        // functions.invoke throws FunctionsHttpError with context carrying the body
+        if (err?.context && typeof err.context.json === "function") {
+          const body = await err.context.json();
+          if (body?.error) errorText = body.error;
+        }
+      } catch {
+        /* keep default */
+      }
+      void serverError;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: errorText,
+          type: "text",
+        },
+      ]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -135,14 +189,14 @@ export function ChatInterface() {
               placeholder={
                 mode === "consultation"
                   ? "اكتب استفسارك هنا..."
-                  : "صف الخطاب المطلوب..."
+                  : "صف الخطاب المطلوب: الجهة، الموضوع، اسمك، رقم الهوية، الجوال..."
               }
               className="w-full bg-secondary/50 border border-border rounded-xl py-4 px-5 pr-5 pl-14 text-base placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:glow-green-subtle transition-all resize-none min-h-[60px] max-h-[200px]"
               rows={1}
             />
             <Button
               onClick={handleSend}
-              disabled={!input.trim()}
+              disabled={!input.trim() || isTyping}
               size="icon"
               className="absolute left-3 bottom-3"
             >
@@ -160,6 +214,29 @@ export function ChatInterface() {
 
 function MessageBubble({ message }: { message: Message }) {
   const isAssistant = message.role === "assistant";
+
+  const copyLetter = () => {
+    if (!message.letter) return;
+    const l = message.letter;
+    const text = [
+      "بسم الله الرحمن الرحيم",
+      "",
+      l.addressee,
+      "",
+      `الموضوع: ${l.subject}`,
+      "",
+      l.greeting,
+      "",
+      ...l.body,
+      "",
+      l.closing,
+      "",
+      `${l.sender_label}: [الاسم]`,
+      "رقم الهوية: [الرقم]",
+      "الجوال: [الرقم]",
+    ].join("\n");
+    navigator.clipboard.writeText(text);
+  };
 
   return (
     <div
@@ -200,40 +277,43 @@ function MessageBubble({ message }: { message: Message }) {
           )}
         >
           {/* Letter Document View */}
-          {message.type === "letter" && isAssistant ? (
+          {message.type === "letter" && message.letter ? (
             <div className="space-y-3">
               <div className="document-paper rounded-lg text-right leading-loose">
                 <p className="text-center text-lg mb-4">بسم الله الرحمن الرحيم</p>
-                <p className="mb-4">معالي وزير الداخلية المحترم</p>
+                <p className="mb-4">{message.letter.addressee}</p>
                 <p className="mb-4">
-                  <strong>الموضوع:</strong> طلب [الموضوع]
+                  <strong>الموضوع:</strong> {message.letter.subject}
                 </p>
-                <p className="mb-4 text-justify">
-                  السلام عليكم ورحمة الله وبركاته، وبعد:
-                </p>
-                <p className="mb-4 text-justify">
-                  نتقدم لمعاليكم بهذا الطلب راجين من الله ثم من معاليكم النظر فيه
-                  والتكرم بالموافقة عليه.
-                </p>
-                <p className="mb-8">
-                  وتفضلوا بقبول وافر الاحترام والتقدير
-                </p>
+                <p className="mb-4 text-justify">{message.letter.greeting}</p>
+                {message.letter.body.map((p, i) => (
+                  <p key={i} className="mb-4 text-justify">
+                    {p}
+                  </p>
+                ))}
+                <p className="mb-8">{message.letter.closing}</p>
                 <div className="flex justify-between items-end">
                   <div>
                     <p>التاريخ: ___/___/____هـ</p>
                     <p>التوقيع: ____________</p>
                   </div>
                   <div className="text-left">
-                    <p>مقدمه: [الاسم]</p>
+                    <p>{message.letter.sender_label}: [الاسم]</p>
                     <p>رقم الهوية: [الرقم]</p>
                     <p>الجوال: [الرقم]</p>
                   </div>
                 </div>
               </div>
 
+              {message.letter.notes ? (
+                <p className="text-sm text-gold bg-accent/10 border border-accent/20 rounded-lg p-3">
+                  ملاحظة: {message.letter.notes}
+                </p>
+              ) : null}
+
               {/* Actions */}
               <div className="flex gap-2 justify-end pt-2">
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={copyLetter}>
                   <Copy className="w-4 h-4 ml-2" />
                   نسخ
                 </Button>
