@@ -3,18 +3,9 @@ import { Send, FileText, MessageCircle, Copy, Download, Sparkles, Crown } from "
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { letterToText, signatureLines, type LetterData } from "@/lib/letter";
 
 type ChatMode = "consultation" | "letter";
-
-interface LetterData {
-  addressee: string;
-  subject: string;
-  greeting: string;
-  body: string[];
-  closing: string;
-  sender_label: string;
-  notes?: string;
-}
 
 interface Message {
   id: string;
@@ -217,25 +208,7 @@ function MessageBubble({ message }: { message: Message }) {
 
   const copyLetter = () => {
     if (!message.letter) return;
-    const l = message.letter;
-    const text = [
-      "بسم الله الرحمن الرحيم",
-      "",
-      l.addressee,
-      "",
-      `الموضوع: ${l.subject}`,
-      "",
-      l.greeting,
-      "",
-      ...l.body,
-      "",
-      l.closing,
-      "",
-      `${l.sender_label}: [الاسم]`,
-      "رقم الهوية: [الرقم]",
-      "الجوال: [الرقم]",
-    ].join("\n");
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(letterToText(message.letter));
   };
 
   return (
@@ -264,14 +237,15 @@ function MessageBubble({ message }: { message: Message }) {
       {/* Content */}
       <div
         className={cn(
-          "flex-1 max-w-[85%]",
+          "flex-1 min-w-0",
+          message.type !== "letter" && "max-w-[85%]",
           !isAssistant && "flex justify-end"
         )}
       >
         <div
           className={cn(
-            "rounded-2xl p-4",
-            isAssistant
+            message.type === "letter" ? "w-full" : "rounded-2xl p-4",
+            message.type === "letter" ? "" : isAssistant
               ? "bg-secondary/80 border border-border/50"
               : "bg-primary/10 border border-primary/20"
           )}
@@ -279,31 +253,25 @@ function MessageBubble({ message }: { message: Message }) {
           {/* Letter Document View */}
           {message.type === "letter" && message.letter ? (
             <div className="space-y-3">
-              <div className="document-paper rounded-lg text-right leading-loose">
-                <p className="text-center text-lg mb-4">بسم الله الرحمن الرحيم</p>
+              <article className="document-paper" dir="rtl" lang="ar" aria-label="معاينة الخطاب">
+                <p className="text-lg mb-8">بسم الله الرحمن الرحيم</p>
                 <p className="mb-4">{message.letter.addressee}</p>
                 <p className="mb-4">
                   <strong>الموضوع:</strong> {message.letter.subject}
                 </p>
-                <p className="mb-4 text-justify">{message.letter.greeting}</p>
+                <p className="mb-4">{message.letter.greeting}</p>
                 {message.letter.body.map((p, i) => (
-                  <p key={i} className="mb-4 text-justify">
+                  <p key={i} className="mb-4">
                     {p}
                   </p>
                 ))}
                 <p className="mb-8">{message.letter.closing}</p>
-                <div className="flex justify-between items-end">
-                  <div>
-                    <p>التاريخ: ___/___/____هـ</p>
-                    <p>التوقيع: ____________</p>
-                  </div>
-                  <div className="text-left">
-                    <p>{message.letter.sender_label}: [الاسم]</p>
-                    <p>رقم الهوية: [الرقم]</p>
-                    <p>الجوال: [الرقم]</p>
-                  </div>
+                <div className="document-signature">
+                  {signatureLines(message.letter).map((line) => <p key={line}>{line}</p>)}
+                  <p className="mt-4">التوقيع:</p>
+                  <div className="document-signature-space" />
                 </div>
-              </div>
+              </article>
 
               {message.letter.notes ? (
                 <p className="text-sm text-gold bg-accent/10 border border-accent/20 rounded-lg p-3">
