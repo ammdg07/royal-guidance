@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { letterToText, signatureLines, type LetterData } from "./letter";
+import { letterToText, signatureLines } from "./letter";
 
-const letter: LetterData = {
+const letter = {
   addressee: "سعادة المدير", subject: "طلب", greeting: "السلام عليكم",
   body: ["أتقدم بطلب الموافقة."], closing: "وفقكم الله", sender_label: "مقدمه",
   sender_name: "أحمد محمد", sender_id: "1234567890",
