@@ -14,7 +14,128 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      conversations: {
+        Row: {
+          created_at: string
+          id: string
+          messages: Json
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          messages?: Json
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          messages?: Json
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      letters: {
+        Row: {
+          content: Json
+          created_at: string
+          id: string
+          preview: Json
+          unlocked: boolean
+          user_id: string
+        }
+        Insert: {
+          content: Json
+          created_at?: string
+          id?: string
+          preview: Json
+          unlocked?: boolean
+          user_id: string
+        }
+        Update: {
+          content?: Json
+          created_at?: string
+          id?: string
+          preview?: Json
+          unlocked?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
+      memberships: {
+        Row: {
+          expires_at: string
+          user_id: string
+        }
+        Insert: {
+          expires_at: string
+          user_id: string
+        }
+        Update: {
+          expires_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      payment_redemptions: {
+        Row: {
+          created_at: string
+          id: string
+          letter_id: string | null
+          order_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          letter_id?: string | null
+          order_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          letter_id?: string | null
+          order_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_redemptions_letter_id_fkey"
+            columns: ["letter_id"]
+            isOneToOne: false
+            referencedRelation: "letters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          full_name: string
+          id: string
+          mobile: string
+          national_id: string
+          theme: string
+        }
+        Insert: {
+          full_name?: string
+          id: string
+          mobile?: string
+          national_id?: string
+          theme?: string
+        }
+        Update: {
+          full_name?: string
+          id?: string
+          mobile?: string
+          national_id?: string
+          theme?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
