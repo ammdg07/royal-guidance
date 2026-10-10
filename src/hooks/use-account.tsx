@@ -12,6 +12,13 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(defaults);
   useEffect(() => {
+    if (!document.getElementById("shl-arabic-font")) {
+      const link = document.createElement("link");
+      link.id = "shl-arabic-font";
+      link.rel = "stylesheet";
+      link.href = "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap";
+      document.head.appendChild(link);
+    }
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
