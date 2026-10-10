@@ -269,6 +269,12 @@
     padding-inline: 8px;
   }
 
+  .letter-purchase-overlay button:nth-last-child(1) {
+    background: hsl(var(--paper));
+    color: hsl(var(--paper-ink));
+    border-color: hsl(var(--paper-line));
+  }
+
   @media (max-width: 640px) {
     .document-paper {
       min-height: 140mm;

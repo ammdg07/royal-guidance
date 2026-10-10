@@ -37,7 +37,7 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
     setBusy(true);
     try {
       const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
-      await document.fonts.ready;
+      await window.document.fonts.ready;
       const canvas = await html2canvas(paper.current, { scale: 2, backgroundColor: null, onclone: doc => {
         const element = doc.querySelector<HTMLElement>(`[data-letter-id="${letterId}"]`);
         if (element) { element.style.width = "794px"; element.style.maxWidth = "none"; element.style.minHeight = "1123px"; element.style.padding = "76px 68px"; element.style.fontSize = "18px"; }
