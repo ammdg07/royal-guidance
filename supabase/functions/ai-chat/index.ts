@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { account } from "../_shared/account.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,6 +49,10 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const session = await account(req);
+    if (!session) return new Response(JSON.stringify({ error: "يرجى تسجيل الدخول." }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
     const apiKey = Deno.env.get("OPENAI_API_KEY");
     if (!apiKey) {
       return new Response(
@@ -56,7 +61,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { messages, mode } = await req.json();
+    const { messages, mode, sender } = await req.json();
     if (!Array.isArray(messages) || messages.length === 0) {
       return new Response(
         JSON.stringify({ error: "لا توجد رسائل لمعالجتها" }),
@@ -65,6 +70,12 @@ Deno.serve(async (req) => {
     }
 
     const isLetter = mode === "letter";
+    if (isLetter && (!sender || !["full_name", "national_id", "mobile", "entity", "details"].every(key =>
+      typeof sender[key] === "string" && sender[key].trim().length > 0 && sender[key].length <= 8000))) {
+      return new Response(JSON.stringify({ error: "يرجى تعبئة الاسم والهوية والجوال والجهة وتفاصيل الطلب." }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const systemPrompt = isLetter ? LETTER_PROMPT : CONSULTATION_PROMPT;
 
     // Sanitize client messages: only role/content kept, roles limited to user/assistant
@@ -126,7 +137,19 @@ Deno.serve(async (req) => {
           { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      return new Response(JSON.stringify({ type: "letter", letter }), {
+       letter.sender_name = sender.full_name.trim();
+       letter.sender_id = sender.national_id.trim();
+       letter.sender_mobile = sender.mobile.trim();
+       letter.sender_date = new Intl.DateTimeFormat("ar-SA", { timeZone: "Asia/Riyadh", day: "numeric", month: "long", year: "numeric" }).format(new Date());
+       letter.notes = "";
+       const { data: membership } = await session.admin.from("memberships").select("expires_at").eq("user_id", session.user.id).maybeSingle();
+       const unlocked = Boolean(membership && Date.parse(membership.expires_at) > Date.now());
+       const preview = { ...letter, body: [], closing: "", greeting: "السلام عليكم ورحمة الله وبركاته، وبعد:" };
+       const { data: saved, error: saveError } = await session.admin.from("letters").insert({
+         user_id: session.user.id, content: letter, preview, unlocked,
+       }).select("id").single();
+       if (saveError || !saved) throw new Error("Letter could not be saved");
+       return new Response(JSON.stringify({ type: "letter", letter: unlocked ? letter : preview, unlocked, letter_id: saved.id }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
