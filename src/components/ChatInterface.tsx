@@ -1,307 +1,105 @@
-import { useState } from "react";
-import { Send, FileText, MessageCircle, Copy, Download, Sparkles, Crown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useEffect, useRef, useState } from "react";
+import { Send, FileText, MessageCircle, Menu, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { letterToText, signatureLines, type LetterData } from "@/lib/letter";
+import { useAccount } from "@/hooks/use-account";
+import { shouldSendOnKey, validLetterRequest, type LetterRequest } from "@/lib/composer";
+import type { LetterData } from "@/lib/letter";
+import { LetterPreview } from "./LetterPreview";
 
-type ChatMode = "consultation" | "letter";
-
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  type: "text" | "letter";
-  letter?: LetterData;
-}
-
-const mockMessages: Message[] = [
-  {
-    id: "1",
-    role: "assistant",
-    content:
-      "السلام عليكم ورحمة الله وبركاته،\n\nأنا مستشارك الحكومي المتخصص. كيف يمكنني خدمتكم اليوم؟\n\nيمكنكم الاختيار بين:\n• الاستشارة: للاستفسار عن الإجراءات والأنظمة الحكومية\n• صياغة خطاب: لإعداد المعاريض والخطابات الرسمية",
-    type: "text",
-  },
-];
-
-export function ChatInterface() {
-  const [mode, setMode] = useState<ChatMode>("consultation");
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
+interface Message { id: string; role: "user" | "assistant"; content: string; letter?: LetterData; letter_id?: string; unlocked?: boolean }
+export function ChatInterface({ onMenu, onSettings, selected, reset, onSaved }: {
+  onMenu: () => void; onSettings: () => void; selected: { id: string; kind: "letter" | "conversation" } | null; reset: number; onSaved: () => void;
+}) {
+  const { user, profile } = useAccount();
+  const [mode, setMode] = useState<"consultation" | "letter">("consultation");
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-
-  const handleSend = async () => {
-    if (!input.trim() || isTyping) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: input,
-      type: "text",
-    };
-
-    const history = [...messages, userMessage];
-    setMessages(history);
-    setInput("");
-    setIsTyping(true);
-
-    try {
-      const { data, error } = await supabase.functions.invoke("ai-chat", {
-        body: {
-          mode,
-          messages: history
-            .filter((m) => m.id !== mockMessages[0].id)
-            .map((m) => ({ role: m.role, content: m.content })),
-        },
-      });
-
-      if (error) throw error;
-
-      const response: Message =
-        data?.type === "letter"
-          ? {
-              id: (Date.now() + 1).toString(),
-              role: "assistant",
-              content: data.letter?.subject ?? "خطاب رسمي",
-              type: "letter",
-              letter: data.letter,
-            }
-          : {
-              id: (Date.now() + 1).toString(),
-              role: "assistant",
-              content: data?.content ?? "تعذّر الحصول على رد. حاول مرة أخرى.",
-              type: "text",
-            };
-
-      setMessages((prev) => [...prev, response]);
-    } catch (err: any) {
-      const serverError = err?.context ? undefined : undefined;
-      let errorText = "حدث خطأ أثناء الاتصال بالخدمة. حاول مرة أخرى.";
-      try {
-        // functions.invoke throws FunctionsHttpError with context carrying the body
-        if (err?.context && typeof err.context.json === "function") {
-          const body = await err.context.json();
-          if (body?.error) errorText = body.error;
-        }
-      } catch {
-        /* keep default */
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+  const [conversation, setConversation] = useState<string | null>(null);
+  const [sender, setSender] = useState<LetterRequest>({ full_name: "", national_id: "", mobile: "", entity: "", details: "" });
+  const end = useRef<HTMLDivElement>(null);
+  useEffect(() => { setSender(prev => ({ ...prev, full_name: profile.full_name, national_id: profile.national_id, mobile: profile.mobile })); }, [profile]);
+  useEffect(() => { setMessages([]); setConversation(null); setStatus(""); setInput(""); }, [reset]);
+  useEffect(() => {
+    if (!selected) return;
+    let live = true;
+    setStatus("");
+    (async () => {
+      if (selected.kind === "letter") {
+        const { data, error } = await supabase.functions.invoke("letter-access", { body: { action: "read", letter_id: selected.id } });
+        if (!live) return;
+        if (error) { setStatus("تعذّر تحميل الخطاب."); return; }
+        setMode("letter"); setMessages([{ id: selected.id, role: "assistant", content: data.letter.subject, letter: data.letter, letter_id: data.letter_id, unlocked: data.unlocked }]);
+      } else {
+        const { data, error } = await supabase.from("conversations").select("messages").eq("id", selected.id).single();
+        if (!live) return;
+        if (error) { setStatus("تعذّر تحميل المحادثة."); return; }
+        setMode("consultation"); setConversation(selected.id); setMessages(data.messages as unknown as Message[]);
       }
-      void serverError;
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: errorText,
-          type: "text",
-        },
-      ]);
-    } finally {
-      setIsTyping(false);
-    }
+    })();
+    return () => { live = false; };
+  }, [selected]);
+  useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [messages, busy]);
+  const send = async () => {
+    if (busy || !user || (mode === "letter" ? !validLetterRequest(sender) : !input.trim())) return;
+    const text = mode === "letter" ? `الجهة: ${sender.entity}\nالاسم: ${sender.full_name}\nالهوية: ${sender.national_id}\nالجوال: ${sender.mobile}\nتفاصيل الطلب: ${sender.details}` : input;
+    const history: Message[] = [...messages, { id: crypto.randomUUID(), role: "user", content: text }];
+    setMessages(history); setInput(""); setBusy(true); setStatus("");
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-chat", { body: { mode, sender: mode === "letter" ? sender : undefined, messages: history.filter(m => !m.letter).map(m => ({ role: m.role, content: m.content })) } });
+      if (error) {
+        const details = error.context && typeof error.context.json === "function" ? await error.context.json() : null;
+        throw new Error(details?.error || "تعذّر الاتصال بالخدمة.");
+      }
+      const result: Message = { id: crypto.randomUUID(), role: "assistant", content: data.content || data.letter?.subject || "", letter: data.letter, letter_id: data.letter_id, unlocked: data.unlocked };
+      const updated = [...history, result]; setMessages(updated);
+      if (mode === "consultation") {
+        const id = conversation || crypto.randomUUID();
+        const { error: saveError } = await supabase.from("conversations").upsert({ id, user_id: user.id, title: text.slice(0, 80), messages: JSON.parse(JSON.stringify(updated)) });
+        if (saveError) setStatus("تم الرد، لكن تعذّر حفظ المحادثة."); else setConversation(id);
+      }
+      onSaved();
+    } catch (e) { setStatus(e instanceof Error ? e.message : "تعذّر إكمال الطلب."); }
+    finally { setBusy(false); }
   };
-
-  return (
-    <div className="flex-1 flex flex-col h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border/50 p-4 glass">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            <h1 className="font-semibold text-lg">المستشار الحكومي</h1>
-          </div>
-
-          {/* Mode Toggle */}
-          <div className="flex items-center bg-secondary rounded-lg p-1 border border-border">
-            <button
-              onClick={() => setMode("consultation")}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
-                mode === "consultation"
-                  ? "bg-primary text-primary-foreground glow-green-subtle"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <MessageCircle className="w-4 h-4" />
-              استشارة
-            </button>
-            <button
-              onClick={() => setMode("letter")}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
-                mode === "letter"
-                  ? "bg-accent text-accent-foreground glow-gold-subtle"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <FileText className="w-4 h-4" />
-              صياغة خطاب
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
-        <div className="max-w-4xl mx-auto p-4 space-y-6">
-          {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
-          ))}
-
-          {isTyping && (
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-primary animate-pulse" />
-              </div>
-              <div className="flex gap-1">
-                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-              </div>
-            </div>
-          )}
-        </div>
+  return <main className="flex-1 min-w-0 min-h-0 flex flex-col bg-background">
+    <header className="shrink-0 border-b border-border p-2 sm:p-4">
+      <div className="flex items-center justify-between gap-2 max-w-4xl mx-auto">
+        <Button variant="ghost" size="icon" aria-label="القائمة" onClick={onMenu} className="min-h-12 min-w-12"><Menu className="w-5 h-5" /></Button>
+        <h1 className="font-semibold text-base sm:text-lg">SHL | المستشار الحكومي</h1>
+        <Button variant="ghost" size="icon" aria-label="الإعدادات" onClick={onSettings} className="min-h-12 min-w-12"><Settings className="w-5 h-5" /></Button>
       </div>
-
-      {/* Input Area */}
-      <div className="border-t border-border/50 p-4 glass">
-        <div className="max-w-4xl mx-auto">
-          <div className="relative">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder={
-                mode === "consultation"
-                  ? "اكتب استفسارك هنا..."
-                  : "صف الخطاب المطلوب: الجهة، الموضوع، اسمك، رقم الهوية، الجوال..."
-              }
-              className="w-full bg-secondary/50 border border-border rounded-xl py-4 px-5 pr-5 pl-14 text-base placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:glow-green-subtle transition-all resize-none min-h-[60px] max-h-[200px]"
-              rows={1}
-            />
-            <Button
-              onClick={handleSend}
-              disabled={!input.trim() || isTyping}
-              size="icon"
-              className="absolute left-3 bottom-3"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
+      <div className="flex gap-2 max-w-4xl mx-auto mt-2">
+        <Button variant={mode === "consultation" ? "default" : "outline"} onClick={() => setMode("consultation")} className="flex-1 min-h-12"><MessageCircle className="w-4 h-4" />استشارة</Button>
+        <Button variant={mode === "letter" ? "premium" : "outline"} onClick={() => setMode("letter")} className="flex-1 min-h-12"><FileText className="w-4 h-4" />صياغة خطاب</Button>
+      </div>
+    </header>
+    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-5">
+      <div className="max-w-4xl mx-auto space-y-5">
+        {mode === "letter" && <form onSubmit={e => { e.preventDefault(); send(); }} onKeyDown={e => { if (e.key === " " && e.target instanceof HTMLButtonElement) e.preventDefault(); }} className="space-y-4 pb-5 border-b border-border">
+          <h2 className="font-semibold text-lg">بيانات المعروض</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {([['full_name', 'الاسم الكامل لصاحب المعروض'], ['national_id', 'رقم الهوية الوطنية'], ['mobile', 'رقم الجوال'], ['entity', 'اسم الجهة الرسمية']] as const).map(([key, label]) => <label key={key} className="block space-y-2"><span className="text-sm">{label}</span><Input required value={sender[key]} onChange={e => setSender({ ...sender, [key]: e.target.value })} inputMode={key === "national_id" || key === "mobile" ? "numeric" : "text"} className="min-h-12 text-base" /></label>)}
           </div>
-          <p className="text-xs text-muted-foreground text-center mt-3">
-            يستند المستشار على المصادر الرسمية فقط (*.gov.sa)
-          </p>
-        </div>
+          <label className="block space-y-2"><span className="text-sm">تفاصيل وسبب الطلب</span><textarea required value={sender.details} onChange={e => setSender({ ...sender, details: e.target.value })} onKeyDown={e => { if (shouldSendOnKey(e.key, e.shiftKey, e.nativeEvent.isComposing)) { e.preventDefault(); send(); } }} className="w-full rounded-md border border-input bg-background p-3 text-base min-h-28 resize-y focus:outline-none focus:ring-2 focus:ring-ring" /></label>
+          <Button type="submit" disabled={busy || !validLetterRequest(sender)} className="min-h-12 w-full sm:w-auto"><FileText className="w-4 h-4" />صياغة المعروض</Button>
+        </form>}
+        {!messages.length && mode === "consultation" && <p className="text-muted-foreground pt-6">السلام عليكم ورحمة الله وبركاته. كيف يمكنني خدمتكم؟</p>}
+        {messages.map(message => message.letter && message.letter_id ? <LetterPreview key={message.id} letter={message.letter} letterId={message.letter_id} unlocked={message.unlocked} onUnlock={onSaved} /> :
+          <div key={message.id} className={message.role === "user" ? "bg-primary/10 border border-primary/20 rounded-lg p-3 whitespace-pre-wrap break-words" : "whitespace-pre-wrap break-words leading-8"}>{message.content}</div>)}
+        {busy && <p role="status" className="text-muted-foreground">جارٍ إعداد الرد…</p>}
+        {status && <p role="alert" className="text-accent text-sm">{status}</p>}
+        <div ref={end} />
       </div>
     </div>
-  );
-}
-
-function MessageBubble({ message }: { message: Message }) {
-  const isAssistant = message.role === "assistant";
-
-  const copyLetter = () => {
-    if (!message.letter) return;
-    navigator.clipboard.writeText(letterToText(message.letter));
-  };
-
-  return (
-    <div
-      className={cn(
-        "flex gap-3 animate-fade-in",
-        !isAssistant && "flex-row-reverse"
-      )}
-    >
-      {/* Avatar */}
-      <div
-        className={cn(
-          "w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center",
-          isAssistant
-            ? "bg-primary/20 border border-primary/30"
-            : "bg-accent/20 border border-accent/30"
-        )}
-      >
-        {isAssistant ? (
-          <Sparkles className="w-4 h-4 text-primary" />
-        ) : (
-          <span className="text-xs font-semibold text-accent">أ</span>
-        )}
+    {mode === "consultation" && <div className="composer shrink-0 border-t border-border p-2 sm:p-4 bg-background">
+      <div className="max-w-4xl mx-auto flex items-end gap-2">
+        <textarea aria-label="رسالتك" value={input} onChange={e => { setInput(e.target.value); e.target.style.height = "auto"; e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`; }} onKeyDown={e => { if (shouldSendOnKey(e.key, e.shiftKey, e.nativeEvent.isComposing)) { e.preventDefault(); send(); } }} placeholder="اكتب استفسارك هنا..." rows={2} className="flex-1 min-w-0 bg-secondary border border-input rounded-lg p-3 text-base resize-none max-h-40 focus:outline-none focus:ring-2 focus:ring-ring" />
+        <Button aria-label="إرسال" size="icon" onKeyDown={e => { if (e.key === " ") e.preventDefault(); }} onClick={send} disabled={busy || !input.trim()} className="min-h-12 min-w-12"><Send className="w-5 h-5" /></Button>
       </div>
-
-      {/* Content */}
-      <div
-        className={cn(
-          "flex-1 min-w-0",
-          message.type !== "letter" && "max-w-[85%]",
-          !isAssistant && "flex justify-end"
-        )}
-      >
-        <div
-          className={cn(
-            message.type === "letter" ? "w-full" : "rounded-2xl p-4",
-            message.type === "letter" ? "" : isAssistant
-              ? "bg-secondary/80 border border-border/50"
-              : "bg-primary/10 border border-primary/20"
-          )}
-        >
-          {/* Letter Document View */}
-          {message.type === "letter" && message.letter ? (
-            <div className="space-y-3">
-              <article className="document-paper" dir="rtl" lang="ar" aria-label="معاينة الخطاب">
-                <p className="text-lg mb-8">بسم الله الرحمن الرحيم</p>
-                <p className="mb-4">{message.letter.addressee}</p>
-                <p className="mb-4">
-                  <strong>الموضوع:</strong> {message.letter.subject}
-                </p>
-                <p className="mb-4">{message.letter.greeting}</p>
-                {message.letter.body.map((p, i) => (
-                  <p key={i} className="mb-4">
-                    {p}
-                  </p>
-                ))}
-                <p className="mb-8">{message.letter.closing}</p>
-                <div className="document-signature">
-                  {signatureLines(message.letter).map((line) => <p key={line}>{line}</p>)}
-                  <p className="mt-4">التوقيع:</p>
-                  <div className="document-signature-space" />
-                </div>
-              </article>
-
-              {message.letter.notes ? (
-                <p className="text-sm text-gold bg-accent/10 border border-accent/20 rounded-lg p-3">
-                  ملاحظة: {message.letter.notes}
-                </p>
-              ) : null}
-
-              {/* Actions */}
-              <div className="flex gap-2 justify-end pt-2">
-                <Button variant="outline" size="sm" onClick={copyLetter}>
-                  <Copy className="w-4 h-4 ml-2" />
-                  نسخ
-                </Button>
-                <Button variant="premium" size="sm">
-                  <Download className="w-4 h-4 ml-2" />
-                  تحميل PDF
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="prose prose-sm prose-invert max-w-none">
-              {message.content.split("\n").map((line, i) => (
-                <p key={i} className={cn("mb-2 last:mb-0", !line && "h-2")}>
-                  {line}
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+    </div>}
+  </main>;
 }

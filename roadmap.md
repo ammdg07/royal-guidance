@@ -1,9 +1,11 @@
 # Current tasks
-- [ ] Use supplied sender details in generated letters and copied text.
-- [ ] Render right-aligned white A4 letters with a structured signature area.
-- [ ] Test sender details and verify the letter flow.
-- [ ] Improve mobile layout, keyboard behavior, and textarea submission.
-- [ ] Require full sender, recipient and request details in letter mode.
-- [ ] Add Salla purchase links and securely verified letter unlocking with PDF and copy.
-- [ ] Add Google/email login, saved sessions and account letter history.
-- [ ] Add light/dark settings, default sender details and history deletion.
+- [x] Use supplied sender details in generated letters and copied text.
+- [x] Render right-aligned white A4 letters with a structured signature area.
+- [x] Test sender details and submission rules.
+- [x] Improve mobile layout, keyboard behavior, and textarea submission.
+- [x] Require full sender, recipient and request details in letter mode.
+- [x] Add protected previews and gated PDF/copy controls.
+- [x] Add Google/email login, saved sessions and account letter history.
+- [x] Add light/dark settings, default sender details and history deletion.
+- [ ] Complete Salla purchase links and automatic paid-order verification — blocked on product/subscription URLs and merchant API authorization/product IDs.
+- [ ] Verify authenticated letter generation, unlock and settings end-to-end — no auth users exist; Salla connection missing, and OpenAI billing previously failed.

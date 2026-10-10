@@ -82,6 +82,27 @@
     --input: 0 0% 12%;
     --ring: 142 76% 45%;
   }
+
+  .light {
+    --background: 0 0% 98%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 142 72% 29%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 93%;
+    --secondary-foreground: 0 0% 15%;
+    --muted: 0 0% 92%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 43 90% 38%;
+    --accent-foreground: 0 0% 100%;
+    --border: 0 0% 82%;
+    --input: 0 0% 80%;
+    --glass: 0 0% 96%;
+    --glass-border: 0 0% 80%;
+  }
 }
 
 @layer base {
@@ -97,6 +118,20 @@
     @apply bg-background text-foreground font-arabic antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+
+  .app-shell {
+    position: fixed;
+    inset-inline: 0;
+    top: 0;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .sidebar-backdrop {
+    background: hsl(var(--paper-shadow) / 0.65);
+  }
+
+  .composer { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
 }
 
 @layer utilities {
@@ -197,6 +232,47 @@
     width: 55mm;
     max-width: 100%;
     border-bottom: 1px solid hsl(var(--paper-line));
+  }
+
+  .locked-letter-body {
+    position: relative;
+    min-height: 310px;
+    margin-block: 1rem;
+  }
+
+  .letter-blur-skeleton {
+    filter: blur(9px);
+    user-select: none;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding-block: 1rem;
+  }
+
+  .letter-blur-skeleton span {
+    height: 9px;
+    background: hsl(var(--paper-ink) / 0.6);
+    width: 100%;
+  }
+
+  .letter-blur-skeleton span:nth-child(3n) { width: 72%; }
+
+  .letter-purchase-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding-inline: 8px;
+  }
+
+  .letter-purchase-overlay button:nth-last-child(1) {
+    background: hsl(var(--paper));
+    color: hsl(var(--paper-ink));
+    border-color: hsl(var(--paper-line));
   }
 
   @media (max-width: 640px) {
