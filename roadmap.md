@@ -6,6 +6,8 @@
 - [x] Require full sender, recipient and request details in letter mode.
 - [x] Add protected previews and gated PDF/copy controls.
 - [x] Add Google/email login, saved sessions and account letter history.
-- [x] Add light/dark settings, default sender details and history deletion.
+- [x] Add default sender details and history deletion.
+- [ ] Replace blur with readable watermarked drafts and payment-gated exports.
+- [ ] Remove appearance switching and enforce a unified formal dark theme.
 - [ ] Complete Salla purchase links and automatic paid-order verification — blocked on product/subscription URLs and merchant API authorization/product IDs.
 - [ ] Verify authenticated letter generation, unlock and settings end-to-end — no auth users exist; Salla connection missing, and OpenAI billing previously failed.

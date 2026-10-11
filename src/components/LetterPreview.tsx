@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { letterToText, signatureLines, type LetterData } from "@/lib/letter";
+import { letterProtection } from "@/lib/letter-protection";
 
 export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlocked = false, onUnlock }: {
   letter: LetterData; letterId: string; unlocked?: boolean; onUnlock: () => void;
@@ -13,6 +14,7 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
   const [order, setOrder] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const protection = letterProtection(unlocked);
   const paper = useRef<HTMLElement>(null);
   const confirm = async () => {
     setBusy(true); setStatus("");
@@ -28,12 +30,12 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
     finally { setBusy(false); }
   };
   const copy = async () => {
-    if (!unlocked) return;
+    if (!protection.canExport) return;
     try { await navigator.clipboard.writeText(letterToText(letter)); setStatus("تم نسخ النص."); }
     catch { setStatus("تعذّر النسخ. تحقق من إذن الحافظة."); }
   };
   const pdf = async () => {
-    if (!unlocked || !paper.current) return;
+    if (!protection.canExport || !paper.current) return;
     setBusy(true);
     try {
       const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
@@ -56,27 +58,27 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
   };
   const purchase = () => setStatus("روابط متجر سلة لم تُضف بعد؛ الشراء غير متاح حالياً.");
   return <div className="w-full min-w-0 space-y-3">
-    <article ref={paper} data-letter-id={letterId} className="document-paper" dir="rtl" lang="ar" aria-label="معاينة الخطاب">
+    <article ref={paper} data-letter-id={letterId} className={`document-paper${protection.selectable ? "" : " document-unpaid"}`} dir="rtl" lang="ar" aria-label="معاينة الخطاب" onCopy={e => { if (!protection.canExport) e.preventDefault(); }} onCut={e => { if (!protection.canExport) e.preventDefault(); }} onDragStart={e => { if (!protection.selectable) e.preventDefault(); }}>
+      {protection.watermarked && <div className="letter-watermark" aria-hidden="true">{Array.from({ length: 24 }, (_, i) => <span key={i}>منصة سهل - مسودة غير مدفوعة</span>)}</div>}
       <p className="text-lg mb-6">بسم الله الرحمن الرحيم</p>
       <p className="font-medium mb-4">{letter.addressee}</p>
       <p className="mb-4"><strong>الموضوع:</strong> {letter.subject}</p>
       <p className="mb-4">{letter.greeting}</p>
-      {unlocked ? <>{letter.body.map((p, i) => <p key={i} className="mb-4">{p}</p>)}<p className="mb-8">{letter.closing}</p></> :
-        <div className="locked-letter-body">
-          <div className="letter-blur-skeleton" aria-hidden="true">{Array.from({ length: 9 }, (_, i) => <span key={i} />)}</div>
-          <div className="letter-purchase-overlay">
-            <LockKeyhole className="w-7 h-7" /><p className="font-semibold">المعروض جاهز</p>
-            <Button variant="premium" className="min-h-12 w-full whitespace-normal" onClick={purchase}><ShoppingBag className="w-4 h-4 shrink-0" />شراء وفك قفل المعروض</Button>
-            <Button variant="outline" className="min-h-12 w-full whitespace-normal" onClick={purchase}>الاشتراك الشهري غير المحدود</Button>
-          </div>
-        </div>}
+      {letter.body.map((p, i) => <p key={i} className="mb-4">{p}</p>)}<p className="mb-8">{letter.closing}</p>
       <div className="document-signature">{signatureLines(letter).map(line => <p key={line}>{line}</p>)}<p className="mt-4">التوقيع:</p><div className="document-signature-space" /></div>
     </article>
+    {!unlocked && <div className="flex flex-col items-center gap-3 py-3">
+      <div className="flex items-center gap-2"><LockKeyhole className="w-5 h-5" /><p className="font-semibold">المعروض جاهز</p></div>
+      <div className="flex w-full flex-col gap-2 sm:flex-row">
+        <Button variant="premium" className="min-h-12 flex-1 whitespace-normal" onClick={purchase}><ShoppingBag className="w-4 h-4 shrink-0" />شراء وفك قفل المعروض</Button>
+        <Button variant="outline" className="min-h-12 flex-1 whitespace-normal" onClick={purchase}>الاشتراك الشهري غير المحدود</Button>
+      </div>
+    </div>}
     {!unlocked && <form onSubmit={e => { e.preventDefault(); if (order.trim()) confirm(); }} className="space-y-2">
       <label htmlFor={`activation-${letterId}`} className="block text-sm">إذا أتممت الدفع، أدخل كود التفعيل أو رقم الطلب هنا</label>
       <div className="flex gap-2"><Input id={`activation-${letterId}`} value={order} onChange={e => setOrder(e.target.value)} className="min-h-12 min-w-0 text-base" /><Button type="submit" disabled={busy || !order.trim()} className="min-h-12">تأكيد</Button></div>
     </form>}
-    <div className="flex flex-wrap justify-end gap-2"><Button variant="outline" onClick={copy} disabled={!unlocked || busy} className="min-h-12"><Copy className="w-4 h-4" />نسخ النص</Button><Button variant="premium" onClick={pdf} disabled={!unlocked || busy} className="min-h-12"><Download className="w-4 h-4" />تحميل PDF</Button></div>
+    <div className="flex flex-wrap justify-end gap-2"><Button variant="outline" onClick={copy} disabled={!protection.canExport || busy} className="min-h-12"><Copy className="w-4 h-4" />نسخ النص</Button><Button variant="premium" onClick={pdf} disabled={!protection.canExport || busy} className="min-h-12"><Download className="w-4 h-4" />تحميل PDF</Button></div>
     {status && <p role="status" className="text-sm text-accent">{status}</p>}
   </div>;
 }

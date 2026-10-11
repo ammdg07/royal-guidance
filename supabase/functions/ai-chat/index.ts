@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
        letter.notes = "";
        const { data: membership } = await session.admin.from("memberships").select("expires_at").eq("user_id", session.user.id).maybeSingle();
        const unlocked = Boolean(membership && Date.parse(membership.expires_at) > Date.now());
-       const preview = { ...letter, body: [], closing: "", greeting: "السلام عليكم ورحمة الله وبركاته، وبعد:" };
+       const preview = letter;
        const { data: saved, error: saveError } = await session.admin.from("letters").insert({
          user_id: session.user.id, content: letter, preview, unlocked,
        }).select("id").single();
