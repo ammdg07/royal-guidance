@@ -10,6 +10,7 @@ export interface LetterData {
   sender_mobile?: string;
   sender_date?: string;
   notes?: string;
+  official_stamp?: boolean;
 }
 
 export function signatureLines(letter: LetterData): string[] {
@@ -28,5 +29,6 @@ export function letterToText(letter: LetterData): string {
     `الموضوع: ${letter.subject}`, "", letter.greeting, "",
     ...letter.body, "", letter.closing, "", ...signatureLines(letter),
     "", "التوقيع: ________________",
+    ...(letter.official_stamp ? ["", "التوقيع الرسمي: ________________", "الختم الرسمي: ________________"] : []),
   ].join("\n");
 }

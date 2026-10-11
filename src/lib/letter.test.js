@@ -9,6 +9,12 @@ const letter = {
 };
 
 describe("letter sender details", () => {
+  test("official stamp and signature placeholders appear only when requested", () => {
+    expect(letterToText({ ...letter, official_stamp: true })).toContain("الختم الرسمي: ________________");
+    expect(letterToText({ ...letter, official_stamp: true })).toContain("التوقيع الرسمي: ________________");
+    expect(letterToText({ ...letter, official_stamp: false })).not.toContain("الختم الرسمي:");
+    expect(letterToText(letter)).not.toContain("التوقيع الرسمي:");
+  });
   test("uses every supplied value in the signature without placeholders", () => {
     expect(signatureLines(letter)).toEqual([
       "مقدمه: أحمد محمد", "رقم الهوية: 1234567890",
