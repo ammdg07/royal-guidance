@@ -11,5 +11,5 @@
 - [x] Add default sender details and history deletion.
 - [x] Replace blur with readable watermarked drafts and payment-gated exports; verified real authenticated generation and mobile preview.
 - [x] Remove appearance switching and enforce a unified formal dark theme; verified account settings.
-- [ ] Complete Salla purchase links and automatic paid-order verification — blocked on product/subscription URLs and merchant API authorization/product IDs.
-- [ ] Verify paid unlock end-to-end — blocked on Salla connection; authenticated generation, watermarked preview and settings verified.
+- [ ] Connect the paid store platform and add purchase links plus automatic paid-order verification — blocked on the user choosing the platform (Salla or another) and supplying product/subscription links and API access.
+- [ ] Verify paid unlock end-to-end — blocked on the store platform connection; authenticated generation, watermarked preview and settings verified.
