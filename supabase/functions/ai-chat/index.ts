@@ -26,6 +26,7 @@ const LETTER_PROMPT = `أنت خبير ومختص في صياغة الخطابا
 4. أخرج نص الخطاب المباشر فقط بدون أي مقدمات أو شروحات جانبية أو تعليقات خارج نص الخطاب.
 5. استخرج اسم المرسل ورقم الهوية وبيانات التواصل والتاريخ من طلب المستخدم ورسائله السابقة، وانقل البيانات المذكورة فوراً كما هي إلى حقول التوقيع أدناه. أحدث بيانات صريحة يذكرها المستخدم هي المعتمدة. لا تستبدل أي بيانات ذكرها المستخدم بأقواس أو حقول فارغة، ولا تضف أقواساً مثل [الاسم] أو [التاريخ].
 6. إذا لم يذكر المستخدم بياناً، أعد حقله كسلسلة فارغة فقط، ولا تختلق بيانات أو تواريخ. لا تضف شروحات أو ملاحظات جانبية؛ اجعل notes فارغاً.
+7. إذا حدد المستخدم اسم الشخص الموجّه إليه الخطاب أو صفته، استخدمه كما ذكره مع الجهة في المخاطبة الرسمية دون اختلاق أسماء. إذا طلب مكاناً للختم والتوقيع الرسمي فاجعل official_stamp صحيحاً؛ ستُخصص مساحة مرتبة أسفل الورقة دون إضافة شروحات داخل الخطاب.
 
 لتوافق النظام التقني فقط: أعد الناتج بصيغة JSON فقط (بدون أي نص خارج JSON) بهذا الشكل، ويكون محتوى كل حقل نص الخطاب الرسمي نفسه:
 {
@@ -77,6 +78,9 @@ Deno.serve(async (req) => {
       });
     }
     const systemPrompt = isLetter ? LETTER_PROMPT : CONSULTATION_PROMPT;
+    if (isLetter && ((sender.recipient_person !== undefined && (typeof sender.recipient_person !== "string" || sender.recipient_person.length > 500)) || (sender.official_stamp !== undefined && typeof sender.official_stamp !== "boolean"))) {
+      return new Response(JSON.stringify({ error: "بيانات المخاطَب أو خيار الختم غير صالحة." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // Sanitize client messages: only role/content kept, roles limited to user/assistant
     const safeMessages = messages
@@ -142,6 +146,8 @@ Deno.serve(async (req) => {
        letter.sender_mobile = sender.mobile.trim();
        letter.sender_date = new Intl.DateTimeFormat("ar-SA", { timeZone: "Asia/Riyadh", day: "numeric", month: "long", year: "numeric" }).format(new Date());
        letter.notes = "";
+       if (sender.recipient_person?.trim()) letter.addressee = `${sender.recipient_person.trim()} — ${sender.entity.trim()}`;
+       letter.official_stamp = sender.official_stamp === true;
        const { data: membership } = await session.admin.from("memberships").select("expires_at").eq("user_id", session.user.id).maybeSingle();
        const unlocked = Boolean(membership && Date.parse(membership.expires_at) > Date.now());
        const preview = letter;

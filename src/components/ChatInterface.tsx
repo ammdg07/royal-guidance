@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Send, FileText, MessageCircle, Menu, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccount } from "@/hooks/use-account";
 import { shouldSendOnKey, validLetterRequest, type LetterRequest } from "@/lib/composer";
@@ -19,7 +20,7 @@ export function ChatInterface({ onMenu, onSettings, selected, reset, onSaved }: 
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [conversation, setConversation] = useState<string | null>(null);
-  const [sender, setSender] = useState<LetterRequest>({ full_name: "", national_id: "", mobile: "", entity: "", details: "" });
+  const [sender, setSender] = useState<LetterRequest>({ full_name: "", national_id: "", mobile: "", entity: "", details: "", recipient_person: "", official_stamp: false });
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { setSender(prev => ({ ...prev, full_name: profile.full_name, national_id: profile.national_id, mobile: profile.mobile })); }, [profile]);
   useEffect(() => { setMessages([]); setConversation(null); setStatus(""); setInput(""); }, [reset]);
@@ -45,7 +46,7 @@ export function ChatInterface({ onMenu, onSettings, selected, reset, onSaved }: 
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [messages, busy]);
   const send = async () => {
     if (busy || !user || (mode === "letter" ? !validLetterRequest(sender) : !input.trim())) return;
-    const text = mode === "letter" ? `الجهة: ${sender.entity}\nالاسم: ${sender.full_name}\nالهوية: ${sender.national_id}\nالجوال: ${sender.mobile}\nتفاصيل الطلب: ${sender.details}` : input;
+    const text = mode === "letter" ? `الجهة: ${sender.entity}\n${sender.recipient_person?.trim() ? `الشخص الموجّه إليه الخطاب أو صفته: ${sender.recipient_person.trim()}\n` : ""}الاسم: ${sender.full_name}\nالهوية: ${sender.national_id}\nالجوال: ${sender.mobile}\nتفاصيل الطلب: ${sender.details}\nتضمين مكان للختم والتوقيع الرسمي: ${sender.official_stamp ? "نعم" : "لا"}` : input;
     const history: Message[] = [...messages, { id: crypto.randomUUID(), role: "user", content: text }];
     setMessages(history); setInput(""); setBusy(true); setStatus("");
     try {
@@ -79,11 +80,14 @@ export function ChatInterface({ onMenu, onSettings, selected, reset, onSaved }: 
     </header>
     <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-5">
       <div className="max-w-4xl mx-auto space-y-5">
+        {!messages.length && <section className="border-b border-border pb-5"><h2 className="text-xl font-semibold">منصة سهل</h2><p className="mt-2 text-sm leading-7 text-muted-foreground">منصة ذكية لصياغة المعاريض والخطابات الرسمية الموجّهة للجهات الحكومية والخاصة بدقة وسرعة.</p></section>}
         {mode === "letter" && <form onSubmit={e => { e.preventDefault(); send(); }} onKeyDown={e => { if (e.key === " " && e.target instanceof HTMLButtonElement) e.preventDefault(); }} className="space-y-4 pb-5 border-b border-border">
           <h2 className="font-semibold text-lg">بيانات المعروض</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {([['full_name', 'الاسم الكامل لصاحب المعروض'], ['national_id', 'رقم الهوية الوطنية'], ['mobile', 'رقم الجوال'], ['entity', 'اسم الجهة الرسمية']] as const).map(([key, label]) => <label key={key} className="block space-y-2"><span className="text-sm">{label}</span><Input required value={sender[key]} onChange={e => setSender({ ...sender, [key]: e.target.value })} inputMode={key === "national_id" || key === "mobile" ? "numeric" : "text"} className="min-h-12 text-base" /></label>)}
           </div>
+          <label className="block space-y-2"><span className="text-sm">اسم الشخص الموجّه إليه الخطاب أو صفته <span className="text-muted-foreground">(اختياري)</span></span><Input value={sender.recipient_person || ""} onChange={e => setSender({ ...sender, recipient_person: e.target.value })} placeholder="معالي الوزير / سعادة المدير العام / فلان بن فلان" className="min-h-12 text-base" /></label>
+          <div className="flex items-center gap-3"><Checkbox id="official-stamp" checked={sender.official_stamp === true} onCheckedChange={checked => setSender({ ...sender, official_stamp: checked === true })} /><label htmlFor="official-stamp" className="cursor-pointer py-2 text-sm leading-6">تضمين مكان للختم والتوقيع الرسمي</label></div>
           <label className="block space-y-2"><span className="text-sm">تفاصيل وسبب الطلب</span><textarea required value={sender.details} onChange={e => setSender({ ...sender, details: e.target.value })} onKeyDown={e => { if (shouldSendOnKey(e.key, e.shiftKey, e.nativeEvent.isComposing)) { e.preventDefault(); send(); } }} className="w-full rounded-md border border-input bg-background p-3 text-base min-h-28 resize-y focus:outline-none focus:ring-2 focus:ring-ring" /></label>
           <Button type="submit" disabled={busy || !validLetterRequest(sender)} className="min-h-12 w-full sm:w-auto"><FileText className="w-4 h-4" />صياغة المعروض</Button>
         </form>}

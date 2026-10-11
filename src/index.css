@@ -218,6 +218,21 @@
     border-bottom: 1px solid hsl(var(--paper-line));
   }
 
+  .document-official-space {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    padding-top: 24px;
+    break-inside: avoid;
+    font-size: 14px;
+  }
+
+  .document-stamp-space {
+    height: 22mm;
+    border: 1px dashed hsl(var(--paper-line));
+    margin-top: 8px;
+  }
+
   .document-unpaid,
   .document-unpaid * {
     -webkit-user-select: none;

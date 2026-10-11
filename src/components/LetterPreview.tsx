@@ -66,6 +66,7 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
       <p className="mb-4">{letter.greeting}</p>
       {letter.body.map((p, i) => <p key={i} className="mb-4">{p}</p>)}<p className="mb-8">{letter.closing}</p>
       <div className="document-signature">{signatureLines(letter).map(line => <p key={line}>{line}</p>)}<p className="mt-4">التوقيع:</p><div className="document-signature-space" /></div>
+      {letter.official_stamp && <div className="document-official-space" aria-label="مكان الختم والتوقيع الرسمي"><div><p>التوقيع الرسمي</p><div className="document-signature-space" /></div><div><p>الختم الرسمي</p><div className="document-stamp-space" /></div></div>}
     </article>
     {!unlocked && <div className="flex flex-col items-center gap-3 py-3">
       <div className="flex items-center gap-2"><LockKeyhole className="w-5 h-5" /><p className="font-semibold">المعروض جاهز</p></div>
