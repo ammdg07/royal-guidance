@@ -20,6 +20,7 @@ Deno.serve(async req => {
       // Fail closed until the merchant's Salla connection and product mapping are supplied.
       return reply({ error: "التحقق من طلبات سلة غير متاح بعد. يلزم إكمال ربط المتجر؛ لم يتم فتح الخطاب أو اعتماد رقم الطلب." }, 503);
     }
-    return reply({ type: "letter", letter_id: letter.id, unlocked: false, letter: letter.preview });
+    // The authenticated owner can inspect the entire watermarked draft before payment.
+    return reply({ type: "letter", letter_id: letter.id, unlocked: false, letter: letter.content });
   } catch { return reply({ error: "تعذّر تحميل الخطاب." }, 500); }
 });

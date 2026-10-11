@@ -49,6 +49,7 @@
     --paper-ink: 0 0% 12%;
     --paper-line: 0 0% 75%;
     --paper-shadow: 0 0% 0%;
+    --watermark-ink: 0 0% 30%;
 
     /* Sidebar */
     --sidebar-background: 0 0% 4%;
@@ -83,26 +84,6 @@
     --ring: 142 76% 45%;
   }
 
-  .light {
-    --background: 0 0% 98%;
-    --foreground: 0 0% 10%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 10%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
-    --primary: 142 72% 29%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 93%;
-    --secondary-foreground: 0 0% 15%;
-    --muted: 0 0% 92%;
-    --muted-foreground: 0 0% 40%;
-    --accent: 43 90% 38%;
-    --accent-foreground: 0 0% 100%;
-    --border: 0 0% 82%;
-    --input: 0 0% 80%;
-    --glass: 0 0% 96%;
-    --glass-border: 0 0% 80%;
-  }
 }
 
 @layer base {
@@ -199,6 +180,9 @@
 
   /* Document Paper Style */
   .document-paper {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     background: hsl(var(--paper));
     color: hsl(var(--paper-ink));
     box-shadow: 0 8px 28px hsl(var(--paper-shadow) / 0.2);
@@ -234,48 +218,37 @@
     border-bottom: 1px solid hsl(var(--paper-line));
   }
 
-  .locked-letter-body {
-    position: relative;
-    min-height: 310px;
-    margin-block: 1rem;
-  }
-
-  .letter-blur-skeleton {
-    filter: blur(9px);
+  .document-unpaid,
+  .document-unpaid * {
+    -webkit-user-select: none;
     user-select: none;
-    pointer-events: none;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    padding-block: 1rem;
+    -webkit-user-drag: none;
   }
 
-  .letter-blur-skeleton span {
-    height: 9px;
-    background: hsl(var(--paper-ink) / 0.6);
-    width: 100%;
-  }
-
-  .letter-blur-skeleton span:nth-child(3n) { width: 72%; }
-
-  .letter-purchase-overlay {
+  .letter-watermark {
     position: absolute;
     inset: 0;
-    display: flex;
-    flex-direction: column;
+    z-index: 1;
+    pointer-events: none;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 180px;
     align-items: center;
-    justify-content: center;
-    gap: 12px;
-    padding-inline: 8px;
+    justify-items: center;
+    color: hsl(var(--watermark-ink) / 0.16);
+    user-select: none;
   }
 
-  .letter-purchase-overlay button:nth-last-child(1) {
-    background: hsl(var(--paper));
-    color: hsl(var(--paper-ink));
-    border-color: hsl(var(--paper-line));
+  .letter-watermark span {
+    transform: rotate(-45deg);
+    font-size: 27px;
+    font-weight: 700;
+    white-space: nowrap;
+    line-height: 1.5;
   }
 
   @media (max-width: 640px) {
+    .letter-watermark { grid-template-columns: minmax(0, 1fr); }
     .document-paper {
       min-height: 140mm;
       padding: 24px 18px;

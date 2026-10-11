@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { useAccount } from "@/hooks/use-account";
 import { supabase } from "@/integrations/supabase/client";
 import { Trash2, LogOut, Save } from "lucide-react";
@@ -27,7 +26,6 @@ export function AccountSettings({ open, onOpenChange, onCleared }: { open: boole
     } catch { setStatus("تعذّر حذف السجل بالكامل. حاول مجدداً."); } finally { setBusy(false); }
   };
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent dir="rtl" className="max-h-[90dvh] overflow-y-auto"><DialogHeader><DialogTitle>الإعدادات</DialogTitle></DialogHeader>
-    <div className="flex items-center justify-between py-3"><label htmlFor="light-mode">الوضع النهاري</label><Switch id="light-mode" checked={draft.theme === "light"} onCheckedChange={checked => setDraft({ ...draft, theme: checked ? "light" : "dark" })} /></div>
     {([['full_name', 'الاسم الكامل'], ['national_id', 'رقم الهوية الوطنية'], ['mobile', 'رقم الجوال']] as const).map(([key, label]) => <label key={key} className="block space-y-2"><span>{label}</span><Input value={draft[key]} onChange={e => setDraft({ ...draft, [key]: e.target.value })} className="min-h-12 text-base" /></label>)}
     <Button onClick={save} disabled={busy} className="min-h-12"><Save className="w-4 h-4" />حفظ</Button>
     <Button variant="destructive" onClick={clear} disabled={busy} className="min-h-12"><Trash2 className="w-4 h-4" />مسح سجل الخطابات والمحادثات</Button>

@@ -29,18 +29,19 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     let live = true;
     setProfile(defaults);
     if (user) supabase.from("profiles").select("full_name,national_id,mobile,theme").eq("id", user.id).maybeSingle()
-      .then(({ data }) => { if (live && data) setProfile(data); });
+      .then(({ data }) => { if (live && data) setProfile({ ...data, theme: "dark" }); });
     return () => { live = false; };
   }, [user?.id]);
   useEffect(() => {
-    document.documentElement.classList.toggle("light", profile.theme === "light");
-    document.documentElement.classList.toggle("dark", profile.theme !== "light");
-  }, [profile.theme]);
+    document.documentElement.classList.remove("light");
+    document.documentElement.classList.add("dark");
+  }, []);
   const saveProfile = async (p: Profile) => {
     if (!user) return;
-    const { error } = await supabase.from("profiles").upsert({ id: user.id, ...p });
+    const fixedProfile = { ...p, theme: "dark" };
+    const { error } = await supabase.from("profiles").upsert({ id: user.id, ...fixedProfile });
     if (error) throw error;
-    setProfile(p);
+    setProfile(fixedProfile);
   };
   return <AccountContext.Provider value={{ user, loading, profile, saveProfile }}>{children}</AccountContext.Provider>;
 }
