@@ -1,6 +1,6 @@
 # Current tasks
-- [ ] Add public header login/signup actions and a concise platform introduction.
-- [ ] Add optional recipient person/title and official stamp/signature space; verify generation and preview.
+- [x] Add public header login/signup actions and a concise platform introduction; verified form switching.
+- [x] Add optional recipient person/title and official stamp/signature space; verified real generation and mobile preview.
 - [x] Use supplied sender details in generated letters and copied text.
 - [x] Render right-aligned white A4 letters with a structured signature area.
 - [x] Test sender details and submission rules.
