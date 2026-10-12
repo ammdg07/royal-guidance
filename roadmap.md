@@ -1,4 +1,5 @@
 # Current tasks
+- [ ] Add the Why SHL introduction, ready-letter revision, language and legal-support options, and two-witness spaces; verify generation and exports.
 - [x] Add public header login/signup actions and a concise platform introduction; verified form switching.
 - [x] Add optional recipient person/title and official stamp/signature space; verified real generation and mobile preview.
 - [x] Use supplied sender details in generated letters and copied text.
