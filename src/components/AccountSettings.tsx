@@ -27,6 +27,7 @@ export function AccountSettings({ open, onOpenChange, onCleared }: { open: boole
   };
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent dir="rtl" className="max-h-[90dvh] overflow-y-auto"><DialogHeader><DialogTitle>الإعدادات</DialogTitle></DialogHeader>
     {([['full_name', 'الاسم الكامل'], ['national_id', 'رقم الهوية الوطنية'], ['mobile', 'رقم الجوال']] as const).map(([key, label]) => <label key={key} className="block space-y-2"><span>{label}</span><Input value={draft[key]} onChange={e => setDraft({ ...draft, [key]: e.target.value })} className="min-h-12 text-base" /></label>)}
+    <p className="text-xs text-muted-foreground">لا تُحفظ هذه البيانات إلا عند الضغط على «حفظ» وبموافقتك، ولا يُحفظ شيء قبل تسجيل الدخول.</p>
     <Button onClick={save} disabled={busy} className="min-h-12"><Save className="w-4 h-4" />حفظ</Button>
     <Button variant="destructive" onClick={clear} disabled={busy} className="min-h-12"><Trash2 className="w-4 h-4" />مسح سجل الخطابات والمحادثات</Button>
     <Button variant="outline" onClick={() => supabase.auth.signOut()} className="min-h-12"><LogOut className="w-4 h-4" />تسجيل الخروج</Button>
