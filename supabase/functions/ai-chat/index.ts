@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { account } from "../_shared/account.ts";
+import { formatLetterDate } from "../_shared/letter-date.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -144,7 +145,7 @@ Deno.serve(async (req) => {
        letter.sender_name = sender.full_name.trim();
        letter.sender_id = sender.national_id.trim();
        letter.sender_mobile = sender.mobile.trim();
-       letter.sender_date = new Intl.DateTimeFormat("ar-SA", { timeZone: "Asia/Riyadh", day: "numeric", month: "long", year: "numeric" }).format(new Date());
+       letter.sender_date = formatLetterDate();
        letter.notes = "";
        if (sender.recipient_person?.trim()) letter.addressee = `${sender.recipient_person.trim()} — ${sender.entity.trim()}`;
        letter.official_stamp = sender.official_stamp === true;
