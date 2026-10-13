@@ -58,15 +58,27 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
       const canvas = await html2canvas(paper.current, { scale: 2, backgroundColor: null, onclone: doc => {
         const element = doc.querySelector<HTMLElement>(`[data-letter-id="${letterId}"]`);
         if (element) { element.style.width = "794px"; element.style.maxWidth = "none"; element.style.minHeight = "1123px"; element.style.padding = "76px 68px"; element.style.fontSize = "18px"; }
+        doc.querySelectorAll(".document-page-number, .document-page-break").forEach(node => node.remove());
       } });
       const document = new jsPDF({ unit: "mm", format: "a4" });
       const pagePixels = Math.floor(canvas.width * 297 / 210);
-      for (let offset = 0; offset < canvas.height; offset += pagePixels) {
-        if (offset) document.addPage();
+      const total = Math.max(1, Math.ceil(canvas.height / pagePixels - 0.01));
+      for (let page = 0; page < total; page++) {
+        const offset = page * pagePixels;
+        if (page) document.addPage();
         const slice = window.document.createElement("canvas");
-        slice.width = canvas.width; slice.height = Math.min(pagePixels, canvas.height - offset);
-        slice.getContext("2d")?.drawImage(canvas, 0, offset, canvas.width, slice.height, 0, 0, canvas.width, slice.height);
-        document.addImage(slice.toDataURL("image/png"), "PNG", 0, 0, 210, slice.height * 210 / canvas.width);
+        slice.width = canvas.width; slice.height = pagePixels;
+        const ctx = slice.getContext("2d");
+        if (ctx) {
+          ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, slice.width, slice.height);
+          ctx.drawImage(canvas, 0, offset, canvas.width, Math.min(pagePixels, canvas.height - offset), 0, 0, canvas.width, Math.min(pagePixels, canvas.height - offset));
+          if (total > 1) {
+            ctx.fillStyle = "#666666"; ctx.textAlign = "center"; ctx.direction = letter.language === "en" ? "ltr" : "rtl";
+            ctx.font = `${Math.round(canvas.width / 794 * 13)}px 'IBM Plex Sans Arabic', Arial, sans-serif`;
+            ctx.fillText(pageLabel(page + 1, total, letter.language), slice.width / 2, slice.height - canvas.width / 794 * 28);
+          }
+        }
+        document.addImage(slice.toDataURL("image/png"), "PNG", 0, 0, 210, 297);
       }
       document.save("SHL-letter.pdf");
     } catch { setStatus("تعذّر تنزيل PDF. حاول مجدداً."); } finally { setBusy(false); }
@@ -80,6 +92,7 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
       <p className="mb-4"><strong>{labels.subject}:</strong> {letter.subject}</p>
       <p className="mb-4">{letter.greeting}</p>
       {letter.body.map((p, i) => <p key={i} className="mb-4">{p}</p>)}<p className="mb-8">{letter.closing}</p>
+      {!!letter.attachments?.length && <section className="document-attachments" aria-label={labels.attachments}><p className="font-semibold">{labels.attachments}:</p><ul>{letter.attachments.map((a, i) => <li key={i}>{a}</li>)}</ul></section>}
       <div className="document-signature">{signatureLines(letter).map(line => <p key={line}>{line}</p>)}<p className="mt-4">{labels.signature}:</p><div className="document-signature-space" /></div>
       {letter.official_stamp && <div className="document-official-space" aria-label="مكان الختم والتوقيع الرسمي"><div><p>{labels.officialSignature}</p><div className="document-signature-space" /></div><div><p>{labels.stamp}</p><div className="document-stamp-space" /></div></div>}
       {letter.witnesses && <section className="document-witnesses" aria-label="الشهود / المعرّفون"><p className="font-semibold mb-3">{labels.witnesses}</p><div className="document-witness-grid">{[0, 1].map(index => <div key={index}>{witnessLines(letter).slice(index * 4, index * 4 + 4).map((line, i) => <p key={i}>{line}</p>)}<div className="document-signature-space" /></div>)}</div></section>}
