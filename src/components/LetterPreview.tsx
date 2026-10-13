@@ -1,9 +1,9 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Copy, Download, LockKeyhole, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { letterToText, signatureLines, letterLabels, witnessLines, type LetterData } from "@/lib/letter";
+import { letterToText, signatureLines, letterLabels, witnessLines, pageLabel, type LetterData } from "@/lib/letter";
 import { letterProtection } from "@/lib/letter-protection";
 
 export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlocked = false, onUnlock }: {
@@ -14,9 +14,24 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
   const [order, setOrder] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pages, setPages] = useState({ total: 1, height: 0 });
   const protection = letterProtection(unlocked);
   const labels = letterLabels(letter);
   const paper = useRef<HTMLElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = paper.current, inner = content.current;
+    if (!el || !inner) return;
+    const measure = () => {
+      const height = el.offsetWidth * 297 / 210;
+      const used = inner.offsetHeight + parseFloat(getComputedStyle(el).paddingTop) * 2;
+      setPages({ total: Math.max(1, Math.ceil(used / height - 0.01)), height });
+    };
+    measure();
+    const observer = new ResizeObserver(measure); observer.observe(el); observer.observe(inner);
+    return () => observer.disconnect();
+  }, [letter]);
+
   const confirm = async () => {
     setBusy(true); setStatus("");
     try {
