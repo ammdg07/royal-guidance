@@ -24,11 +24,6 @@ export function letterLabels(letter: LetterData) {
   };
 }
 
-export function pageLabel(page: number, total: number, language?: "ar" | "en"): string {
-  if (language === "en") return `Page ${page} of ${total}`;
-  const n = (v: number) => v.toLocaleString("ar-SA-u-nu-arab");
-  return `صفحة ${n(page)} من ${n(total)}`;
-}
 
 export function attachmentLines(letter: LetterData): string[] {
   const items = (letter.attachments || []).map(a => a.trim()).filter(Boolean);
