@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { account } from "../_shared/account.ts";
 import { formatLetterDate } from "../_shared/letter-date.ts";
+import { legalInstruction, revisionInstruction, validLetterOptions } from "../_shared/letter-options.ts";
+import { legalContext } from "../_shared/legal-context.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -71,16 +73,26 @@ Deno.serve(async (req) => {
       );
     }
 
-    const isLetter = mode === "letter";
-    if (isLetter && (!sender || !["full_name", "national_id", "mobile", "entity", "details"].every(key =>
+    if (!["consultation", "letter", "improve"].includes(mode)) return new Response(JSON.stringify({ error: "نوع الطلب غير صالح." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const isLetter = mode === "letter" || mode === "improve";
+    if (isLetter && (!sender || !["full_name", "national_id", "mobile", "entity", mode === "improve" ? "original_letter" : "details"].every(key =>
       typeof sender[key] === "string" && sender[key].trim().length > 0 && sender[key].length <= 8000))) {
       return new Response(JSON.stringify({ error: "يرجى تعبئة الاسم والهوية والجوال والجهة وتفاصيل الطلب." }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const systemPrompt = isLetter ? LETTER_PROMPT : CONSULTATION_PROMPT;
-    if (isLetter && ((sender.recipient_person !== undefined && (typeof sender.recipient_person !== "string" || sender.recipient_person.length > 500)) || (sender.official_stamp !== undefined && typeof sender.official_stamp !== "boolean"))) {
+    let systemPrompt = isLetter ? LETTER_PROMPT : CONSULTATION_PROMPT;
+    if (isLetter && !validLetterOptions(sender)) {
       return new Response(JSON.stringify({ error: "بيانات المخاطَب أو خيار الختم غير صالحة." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    let notice = "";
+    if (isLetter) {
+      systemPrompt += `\n${revisionInstruction(mode === "improve")}\n${sender.language === "en" ? "اكتب جميع أقسام الخطاب باللغة الإنجليزية الرسمية الاحترافية حصراً، بما فيها التحية والخاتمة وعنوان الموضوع. احتفظ ببيانات المرسل والجهة كما وردت دون ترجمة الأسماء أو اختلاق تهجئتها." : "اكتب جميع أقسام الخطاب بالعربية الفصحى الرسمية."}\nلا تضف حقول الشهود أو الختم داخل فقرات الخطاب؛ النظام يخصصها أسفل الورقة. لا تستشهد بمواد نظامية أو أرقام قوانين من ذاكرتك."`;
+      if (sender.legal_support === true) {
+        const context = await legalContext(mode === "improve" ? sender.original_letter : sender.details);
+        systemPrompt += `\n${legalInstruction(context)}`;
+        if (!context) notice = "تعذّر التحقق من نص نظامي رسمي لهذا الطلب؛ صيغ الخطاب دون الاستشهاد بمواد محددة. يُرجى مراجعة الجهة المختصة.";
+      }
     }
 
     // Sanitize client messages: only role/content kept, roles limited to user/assistant
@@ -91,7 +103,7 @@ Deno.serve(async (req) => {
 
     const body: Record<string, unknown> = {
       model: "gpt-4o",
-      messages: [{ role: "system", content: systemPrompt }, ...safeMessages],
+      messages: [{ role: "system", content: systemPrompt }, ...(isLetter ? [{ role: "user", content: JSON.stringify({ full_name: sender.full_name, national_id: sender.national_id, mobile: sender.mobile, entity: sender.entity, recipient_person: sender.recipient_person, details: mode === "improve" ? sender.original_letter : sender.details }) }] : safeMessages)],
       temperature: 0.4,
     };
     if (isLetter) {
@@ -136,6 +148,7 @@ Deno.serve(async (req) => {
       let letter: any;
       try {
         letter = JSON.parse(content);
+        if (!letter || !Array.isArray(letter.body) || !letter.body.every((p: unknown) => typeof p === "string") || !["addressee", "subject", "greeting", "closing"].every(key => typeof letter[key] === "string")) throw new Error("Invalid letter output");
       } catch {
         return new Response(
           JSON.stringify({ error: "تعذّر توليد الخطاب بشكل صحيح. حاول مرة أخرى." }),
@@ -149,6 +162,8 @@ Deno.serve(async (req) => {
        letter.notes = "";
        if (sender.recipient_person?.trim()) letter.addressee = `${sender.recipient_person.trim()} — ${sender.entity.trim()}`;
        letter.official_stamp = sender.official_stamp === true;
+       letter.witnesses = sender.witnesses === true;
+       letter.language = sender.language === "en" ? "en" : "ar";
        const { data: membership } = await session.admin.from("memberships").select("expires_at").eq("user_id", session.user.id).maybeSingle();
        const unlocked = Boolean(membership && Date.parse(membership.expires_at) > Date.now());
        const preview = letter;
@@ -156,7 +171,7 @@ Deno.serve(async (req) => {
          user_id: session.user.id, content: letter, preview, unlocked,
        }).select("id").single();
        if (saveError || !saved) throw new Error("Letter could not be saved");
-       return new Response(JSON.stringify({ type: "letter", letter: unlocked ? letter : preview, unlocked, letter_id: saved.id }), {
+       return new Response(JSON.stringify({ type: "letter", letter: unlocked ? letter : preview, unlocked, letter_id: saved.id, notice }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { letterToText, signatureLines } from "./letter";
+import { letterToText, signatureLines, witnessLines } from "./letter";
 
 const letter = {
   addressee: "سعادة المدير", subject: "طلب", greeting: "السلام عليكم",
@@ -9,6 +9,23 @@ const letter = {
 };
 
 describe("letter sender details", () => {
+  test("Exactly two witness spaces contain name, ID and signature only when selected", () => {
+    const lines = witnessLines({ ...letter, witnesses: true });
+    expect(lines).toHaveLength(8);
+    expect(lines[0]).toBe("الشاهد / المعرّف 1");
+    expect(lines[4]).toBe("الشاهد / المعرّف 2");
+    for (const field of ["الاسم", "رقم الهوية", "التوقيع"]) expect(lines.filter(line => line.startsWith(field + ":"))).toHaveLength(2);
+    expect(witnessLines(letter)).toEqual([]);
+    expect(letterToText({ ...letter, witnesses: true })).toContain(lines[4]);
+  });
+  test("Formal English exports retain sender details with English labels", () => {
+    const text = letterToText({ ...letter, language: "en", witnesses: true, official_stamp: true });
+    expect(text).toContain("Subject: طلب");
+    expect(text).toContain("National ID: 1234567890");
+    expect(text).toContain("Witness / Identifier 2");
+    expect(text).toContain("Official stamp:");
+    expect(text).not.toContain("الموضوع:");
+  });
   test("official stamp and signature placeholders appear only when requested", () => {
     expect(letterToText({ ...letter, official_stamp: true })).toContain("الختم الرسمي: ________________");
     expect(letterToText({ ...letter, official_stamp: true })).toContain("التوقيع الرسمي: ________________");
