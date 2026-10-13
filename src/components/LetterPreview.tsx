@@ -3,7 +3,7 @@ import { Copy, Download, LockKeyhole, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { letterToText, signatureLines, type LetterData } from "@/lib/letter";
+import { letterToText, signatureLines, letterLabels, witnessLines, type LetterData } from "@/lib/letter";
 import { letterProtection } from "@/lib/letter-protection";
 
 export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlocked = false, onUnlock }: {
@@ -15,6 +15,7 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const protection = letterProtection(unlocked);
+  const labels = letterLabels(letter);
   const paper = useRef<HTMLElement>(null);
   const confirm = async () => {
     setBusy(true); setStatus("");
@@ -58,15 +59,16 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
   };
   const purchase = () => setStatus("روابط متجر سلة لم تُضف بعد؛ الشراء غير متاح حالياً.");
   return <div className="w-full min-w-0 space-y-3">
-    <article ref={paper} data-letter-id={letterId} className={`document-paper${protection.selectable ? "" : " document-unpaid"}`} dir="rtl" lang="ar" aria-label="معاينة الخطاب" onCopy={e => { if (!protection.canExport) e.preventDefault(); }} onCut={e => { if (!protection.canExport) e.preventDefault(); }} onDragStart={e => { if (!protection.selectable) e.preventDefault(); }}>
+    <article ref={paper} data-letter-id={letterId} className={`document-paper${letter.language === "en" ? " document-english" : ""}${protection.selectable ? "" : " document-unpaid"}`} dir={letter.language === "en" ? "ltr" : "rtl"} lang={letter.language || "ar"} aria-label="معاينة الخطاب" onCopy={e => { if (!protection.canExport) e.preventDefault(); }} onCut={e => { if (!protection.canExport) e.preventDefault(); }} onDragStart={e => { if (!protection.selectable) e.preventDefault(); }}>
       {protection.watermarked && <div className="letter-watermark" aria-hidden="true">{Array.from({ length: 24 }, (_, i) => <span key={i}>منصة سهل - مسودة غير مدفوعة</span>)}</div>}
-      <p className="text-lg mb-6">بسم الله الرحمن الرحيم</p>
+      <p className="text-lg mb-6">{labels.basmala}</p>
       <p className="font-medium mb-4">{letter.addressee}</p>
-      <p className="mb-4"><strong>الموضوع:</strong> {letter.subject}</p>
+      <p className="mb-4"><strong>{labels.subject}:</strong> {letter.subject}</p>
       <p className="mb-4">{letter.greeting}</p>
       {letter.body.map((p, i) => <p key={i} className="mb-4">{p}</p>)}<p className="mb-8">{letter.closing}</p>
-      <div className="document-signature">{signatureLines(letter).map(line => <p key={line}>{line}</p>)}<p className="mt-4">التوقيع:</p><div className="document-signature-space" /></div>
-      {letter.official_stamp && <div className="document-official-space" aria-label="مكان الختم والتوقيع الرسمي"><div><p>التوقيع الرسمي</p><div className="document-signature-space" /></div><div><p>الختم الرسمي</p><div className="document-stamp-space" /></div></div>}
+      <div className="document-signature">{signatureLines(letter).map(line => <p key={line}>{line}</p>)}<p className="mt-4">{labels.signature}:</p><div className="document-signature-space" /></div>
+      {letter.official_stamp && <div className="document-official-space" aria-label="مكان الختم والتوقيع الرسمي"><div><p>{labels.officialSignature}</p><div className="document-signature-space" /></div><div><p>{labels.stamp}</p><div className="document-stamp-space" /></div></div>}
+      {letter.witnesses && <section className="document-witnesses" aria-label="الشهود / المعرّفون"><p className="font-semibold mb-3">{labels.witnesses}</p><div className="document-witness-grid">{[0, 1].map(index => <div key={index}>{witnessLines(letter).slice(index * 4, index * 4 + 4).map((line, i) => <p key={i}>{line}</p>)}<div className="document-signature-space" /></div>)}</div></section>}
     </article>
     {!unlocked && <div className="flex flex-col items-center gap-3 py-3">
       <div className="flex items-center gap-2"><LockKeyhole className="w-5 h-5" /><p className="font-semibold">المعروض جاهز</p></div>

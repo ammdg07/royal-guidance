@@ -218,6 +218,12 @@
     border-bottom: 1px solid hsl(var(--paper-line));
   }
 
+  .document-english { direction: ltr; text-align: left; font-family: Arial, sans-serif; }
+  .document-english .document-signature { text-align: left; }
+  .document-witnesses { padding-top: 24px; break-inside: avoid; font-size: 14px; }
+  .document-witness-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  @media (max-width: 640px) { .document-witness-grid { grid-template-columns: minmax(0, 1fr); } }
+
   .document-official-space {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
