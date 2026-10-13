@@ -20,15 +20,14 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
   const paper = useRef<HTMLElement>(null);
   const content = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const el = paper.current, inner = content.current;
-    if (!el || !inner) return;
+    const el = paper.current;
+    if (!el) return;
     const measure = () => {
       const height = el.offsetWidth * 297 / 210;
-      const used = inner.offsetHeight + parseFloat(getComputedStyle(el).paddingTop) * 2;
-      setPages({ total: Math.max(1, Math.ceil(used / height - 0.01)), height });
+      setPages({ total: Math.max(1, Math.ceil(el.scrollHeight / height - 0.01)), height });
     };
     measure();
-    const observer = new ResizeObserver(measure); observer.observe(el); observer.observe(inner);
+    const observer = new ResizeObserver(measure); observer.observe(el);
     return () => observer.disconnect();
   }, [letter]);
 
