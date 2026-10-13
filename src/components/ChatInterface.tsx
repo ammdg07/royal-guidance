@@ -10,6 +10,9 @@ import { shouldSendOnKey, validLetterRequest, type LetterRequest } from "@/lib/c
 import type { LetterData } from "@/lib/letter";
 import { LetterPreview } from "./LetterPreview";
 import { WhySHL } from "./WhySHL";
+import { entityAddressee, toneIssues } from "../../supabase/functions/_shared/letter-rules";
+
+const ATTACHMENT_PRESETS = ["صورة الهوية الوطنية", "تقرير طبي", "مشهد راتب", "صك إعالة"];
 
 interface Message { id: string; role: "user" | "assistant"; content: string; letter?: LetterData; letter_id?: string; unlocked?: boolean }
 export function ChatInterface({ onMenu, onSettings, selected, reset, onSaved }: {
@@ -23,6 +26,11 @@ export function ChatInterface({ onMenu, onSettings, selected, reset, onSaved }: 
   const [status, setStatus] = useState("");
   const [conversation, setConversation] = useState<string | null>(null);
   const [sender, setSender] = useState<LetterRequest>({ full_name: "", national_id: "", mobile: "", entity: "", details: "", recipient_person: "", official_stamp: false });
+  const [attachOn, setAttachOn] = useState(false);
+  const [customAttachment, setCustomAttachment] = useState("");
+  const attachments = sender.attachments || [];
+  const toggleAttachment = (item: string) => setSender({ ...sender, attachments: attachments.includes(item) ? attachments.filter(a => a !== item) : [...attachments, item] });
+  const issues = toneIssues(mode === "improve" ? sender.original_letter || "" : sender.details);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { setSender(prev => ({ ...prev, full_name: profile.full_name, national_id: profile.national_id, mobile: profile.mobile })); }, [profile]);
   useEffect(() => { setMessages([]); setConversation(null); setStatus(""); setInput(""); }, [reset]);
@@ -52,7 +60,7 @@ export function ChatInterface({ onMenu, onSettings, selected, reset, onSaved }: 
     const history: Message[] = [...messages, { id: crypto.randomUUID(), role: "user", content: text }];
     setMessages(history); setInput(""); setBusy(true); setStatus("");
     try {
-      const { data, error } = await supabase.functions.invoke("ai-chat", { body: { mode, sender: mode !== "consultation" ? sender : undefined, messages: history.filter(m => !m.letter).map(m => ({ role: m.role, content: m.content })) } });
+      const { data, error } = await supabase.functions.invoke("ai-chat", { body: { mode, sender: mode !== "consultation" ? { ...sender, attachments: attachOn && attachments.length ? attachments : undefined, letter_type: mode === "letter" ? sender.letter_type || "general" : undefined } : undefined, messages: history.filter(m => !m.letter).map(m => ({ role: m.role, content: m.content })) } });
       if (error) {
         const details = error.context && typeof error.context.json === "function" ? await error.context.json() : null;
         throw new Error(details?.error || "تعذّر الاتصال بالخدمة.");
@@ -88,9 +96,11 @@ export function ChatInterface({ onMenu, onSettings, selected, reset, onSaved }: 
         {!messages.length && mode === "consultation" && <WhySHL />}
         {mode !== "consultation" && <form onSubmit={e => { e.preventDefault(); send(); }} onKeyDown={e => { if (e.key === " " && e.target instanceof HTMLButtonElement) e.preventDefault(); }} className="space-y-4 pb-5 border-b border-border">
           <h2 className="font-semibold text-lg">{mode === "improve" ? "تحسين وتدقيق خطاب جاهز" : "بيانات المعروض"}</h2>
+          {mode === "letter" && <div className="space-y-2"><label id="letter-type-label" className="text-sm">نوع الخطاب</label><Select value={sender.letter_type || "general"} onValueChange={value => { if (value === "general" || value === "cover_letter") setSender({ ...sender, letter_type: value }); }}><SelectTrigger aria-labelledby="letter-type-label" className="min-h-12"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="general">معروض / خطاب رسمي عام</SelectItem><SelectItem value="cover_letter">خطاب طلب وظيفة / Cover Letter</SelectItem></SelectContent></Select>{sender.letter_type === "cover_letter" && <p className="text-xs text-muted-foreground leading-6">اكتب في التفاصيل الوظيفة المطلوبة ومؤهلاتك وخبراتك ومهاراتك، واجعل الجهة اسم الشركة.</p>}</div>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {([['full_name', 'الاسم الكامل لصاحب المعروض'], ['national_id', 'رقم الهوية الوطنية'], ['mobile', 'رقم الجوال'], ['entity', 'اسم الجهة الرسمية']] as const).map(([key, label]) => <label key={key} className="block space-y-2"><span className="text-sm">{label}</span><Input required value={sender[key]} onChange={e => setSender({ ...sender, [key]: e.target.value })} inputMode={key === "national_id" || key === "mobile" ? "numeric" : "text"} className="min-h-12 text-base" /></label>)}
           </div>
+          {sender.entity.trim() && !sender.recipient_person?.trim() && sender.language !== "en" && <p className="text-xs text-muted-foreground">اللقب البروتوكولي المقترح تلقائياً: <span className="text-foreground">{entityAddressee(sender.entity)}</span></p>}
           <label className="block space-y-2"><span className="text-sm">اسم الشخص الموجّه إليه الخطاب أو صفته <span className="text-muted-foreground">(اختياري)</span></span><Input value={sender.recipient_person || ""} onChange={e => setSender({ ...sender, recipient_person: e.target.value })} placeholder="معالي الوزير / سعادة المدير العام / فلان بن فلان" className="min-h-12 text-base" /></label>
           <div className="flex items-center gap-3"><Checkbox id="official-stamp" checked={sender.official_stamp === true} onCheckedChange={checked => setSender({ ...sender, official_stamp: checked === true })} /><label htmlFor="official-stamp" className="cursor-pointer py-2 text-sm leading-6">تضمين مكان للختم والتوقيع الرسمي</label></div>
           <div className="border-y border-border py-4 space-y-3">
@@ -98,8 +108,14 @@ export function ChatInterface({ onMenu, onSettings, selected, reset, onSaved }: 
             <div className="space-y-2"><label id="letter-language-label" className="text-sm">لغة الصياغة</label><Select value={sender.language || "ar"} onValueChange={value => { if (value === "ar" || value === "en") setSender({ ...sender, language: value }); }}><SelectTrigger aria-labelledby="letter-language-label" className="min-h-12"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ar">اللغة العربية الرسمية</SelectItem><SelectItem value="en">اللغة الإنجليزية الرسمية (Formal English)</SelectItem></SelectContent></Select></div>
             <div className="flex items-start gap-3"><Checkbox id="legal-support" className="mt-3 shrink-0" checked={sender.legal_support === true} onCheckedChange={checked => setSender({ ...sender, legal_support: checked === true })} /><label htmlFor="legal-support" className="cursor-pointer py-2 text-sm leading-7">تدعيم الخطاب بالأنظمة واللوائح <span className="text-xs text-muted-foreground">(مثال: الاستناد إلى المادة ٧٧ من نظام العمل، أو لوائح الموارد البشرية)</span></label></div>
             <div className="flex items-center gap-3"><Checkbox id="witnesses" checked={sender.witnesses === true} onCheckedChange={checked => setSender({ ...sender, witnesses: checked === true })} /><label htmlFor="witnesses" className="cursor-pointer py-2 text-sm leading-6">إضافة خانة الشهود / المعرّفين</label></div>
+            <div className="flex items-center gap-3"><Checkbox id="attachments" checked={attachOn} onCheckedChange={checked => setAttachOn(checked === true)} /><label htmlFor="attachments" className="cursor-pointer py-2 text-sm leading-6">إضافة قائمة بالمرفقات الرسمية</label></div>
+            {attachOn && <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">{[...new Set([...ATTACHMENT_PRESETS, ...attachments])].map(item => <Button key={item} type="button" size="sm" variant={attachments.includes(item) ? "default" : "outline"} aria-pressed={attachments.includes(item)} onClick={() => toggleAttachment(item)} className="min-h-10">{item}</Button>)}</div>
+              <div className="flex gap-2"><Input value={customAttachment} maxLength={200} onChange={e => setCustomAttachment(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); const v = customAttachment.trim(); if (v && !attachments.includes(v)) setSender({ ...sender, attachments: [...attachments, v] }); setCustomAttachment(""); } }} placeholder="مرفق آخر…" className="min-h-12 min-w-0 text-base" /><Button type="button" variant="outline" className="min-h-12" disabled={!customAttachment.trim() || attachments.length >= 15} onClick={() => { const v = customAttachment.trim(); if (!attachments.includes(v)) setSender({ ...sender, attachments: [...attachments, v] }); setCustomAttachment(""); }}>إضافة</Button></div>
+            </div>}
           </div>
           <label className="block space-y-2"><span className="text-sm">{mode === "improve" ? "نص الخطاب الجاهز" : "تفاصيل وسبب الطلب"}</span><textarea required maxLength={8000} value={mode === "improve" ? sender.original_letter || "" : sender.details} onChange={e => setSender({ ...sender, [mode === "improve" ? "original_letter" : "details"]: e.target.value })} onKeyDown={e => { if (shouldSendOnKey(e.key, e.shiftKey, e.nativeEvent.isComposing)) { e.preventDefault(); send(); } }} className="w-full rounded-md border border-input bg-background p-3 text-base min-h-40 resize-y focus:outline-none focus:ring-2 focus:ring-ring" /></label>
+          {issues.length > 0 && <p role="note" className="rounded-md border border-accent/40 bg-accent/10 p-3 text-sm leading-7">تنبيه لطيف: يحتوي النص على عبارات عامية أو حادة لا تناسب المخاطبات الرسمية ({issues.join("، ")}). يُفضّل تعديلها، وسيقوم النظام بتهذيبها وصياغتها بأسلوب نظامي وقور.</p>}
           <Button type="submit" disabled={busy || !validLetterRequest(sender, mode)} className="min-h-12 w-full sm:w-auto"><FileText className="w-4 h-4" />{mode === "improve" ? "تحسين وتدقيق الخطاب" : "صياغة المعروض"}</Button>
         </form>}
         {!messages.length && mode === "consultation" && <p className="text-muted-foreground pt-6">السلام عليكم ورحمة الله وبركاته. كيف يمكنني خدمتكم؟</p>}
