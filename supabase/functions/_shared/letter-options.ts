@@ -1,6 +1,10 @@
+import { validAttachments } from "./letter-rules.ts";
+
 export function validLetterOptions(sender: Record<string, unknown>): boolean {
   return ["official_stamp", "legal_support", "witnesses"].every(key => sender[key] === undefined || typeof sender[key] === "boolean")
     && (sender.language === undefined || sender.language === "ar" || sender.language === "en")
+    && (sender.letter_type === undefined || sender.letter_type === "general" || sender.letter_type === "cover_letter")
+    && validAttachments(sender.attachments)
     && (sender.recipient_person === undefined || typeof sender.recipient_person === "string" && sender.recipient_person.length <= 500);
 }
 

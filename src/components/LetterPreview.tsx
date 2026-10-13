@@ -1,9 +1,9 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Copy, Download, LockKeyhole, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { letterToText, signatureLines, letterLabels, witnessLines, type LetterData } from "@/lib/letter";
+import { letterToText, signatureLines, letterLabels, witnessLines, pageLabel, type LetterData } from "@/lib/letter";
 import { letterProtection } from "@/lib/letter-protection";
 
 export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlocked = false, onUnlock }: {
@@ -14,9 +14,23 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
   const [order, setOrder] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pages, setPages] = useState({ total: 1, height: 0 });
   const protection = letterProtection(unlocked);
   const labels = letterLabels(letter);
   const paper = useRef<HTMLElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = paper.current;
+    if (!el) return;
+    const measure = () => {
+      const height = el.offsetWidth * 297 / 210;
+      setPages({ total: Math.max(1, Math.ceil(el.scrollHeight / height - 0.01)), height });
+    };
+    measure();
+    const observer = new ResizeObserver(measure); observer.observe(el);
+    return () => observer.disconnect();
+  }, [letter]);
+
   const confirm = async () => {
     setBusy(true); setStatus("");
     try {
@@ -44,31 +58,48 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
       const canvas = await html2canvas(paper.current, { scale: 2, backgroundColor: null, onclone: doc => {
         const element = doc.querySelector<HTMLElement>(`[data-letter-id="${letterId}"]`);
         if (element) { element.style.width = "794px"; element.style.maxWidth = "none"; element.style.minHeight = "1123px"; element.style.padding = "76px 68px"; element.style.fontSize = "18px"; }
+        doc.querySelectorAll(".document-page-number, .document-page-break").forEach(node => node.remove());
       } });
       const document = new jsPDF({ unit: "mm", format: "a4" });
       const pagePixels = Math.floor(canvas.width * 297 / 210);
-      for (let offset = 0; offset < canvas.height; offset += pagePixels) {
-        if (offset) document.addPage();
+      const total = Math.max(1, Math.ceil(canvas.height / pagePixels - 0.01));
+      for (let page = 0; page < total; page++) {
+        const offset = page * pagePixels;
+        if (page) document.addPage();
         const slice = window.document.createElement("canvas");
-        slice.width = canvas.width; slice.height = Math.min(pagePixels, canvas.height - offset);
-        slice.getContext("2d")?.drawImage(canvas, 0, offset, canvas.width, slice.height, 0, 0, canvas.width, slice.height);
-        document.addImage(slice.toDataURL("image/png"), "PNG", 0, 0, 210, slice.height * 210 / canvas.width);
+        slice.width = canvas.width; slice.height = pagePixels;
+        const ctx = slice.getContext("2d");
+        if (ctx) {
+          ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, slice.width, slice.height);
+          ctx.drawImage(canvas, 0, offset, canvas.width, Math.min(pagePixels, canvas.height - offset), 0, 0, canvas.width, Math.min(pagePixels, canvas.height - offset));
+          if (total > 1) {
+            ctx.fillStyle = "#666666"; ctx.textAlign = "center"; ctx.direction = letter.language === "en" ? "ltr" : "rtl";
+            ctx.font = `${Math.round(canvas.width / 794 * 13)}px 'IBM Plex Sans Arabic', Arial, sans-serif`;
+            ctx.fillText(pageLabel(page + 1, total, letter.language), slice.width / 2, slice.height - canvas.width / 794 * 28);
+          }
+        }
+        document.addImage(slice.toDataURL("image/png"), "PNG", 0, 0, 210, 297);
       }
       document.save("SHL-letter.pdf");
     } catch { setStatus("تعذّر تنزيل PDF. حاول مجدداً."); } finally { setBusy(false); }
   };
   const purchase = () => setStatus("روابط متجر سلة لم تُضف بعد؛ الشراء غير متاح حالياً.");
   return <div className="w-full min-w-0 space-y-3">
-    <article ref={paper} data-letter-id={letterId} className={`document-paper${letter.language === "en" ? " document-english" : ""}${protection.selectable ? "" : " document-unpaid"}`} dir={letter.language === "en" ? "ltr" : "rtl"} lang={letter.language || "ar"} aria-label="معاينة الخطاب" onCopy={e => { if (!protection.canExport) e.preventDefault(); }} onCut={e => { if (!protection.canExport) e.preventDefault(); }} onDragStart={e => { if (!protection.selectable) e.preventDefault(); }}>
+    <article ref={paper} data-letter-id={letterId} className={`document-paper${letter.language === "en" ? " document-english" : ""}${protection.selectable ? "" : " document-unpaid"}`} dir={letter.language === "en" ? "ltr" : "rtl"} lang={letter.language || "ar"} aria-label="معاينة الخطاب" style={pages.total > 1 ? { minHeight: pages.total * pages.height } : undefined} onCopy={e => { if (!protection.canExport) e.preventDefault(); }} onCut={e => { if (!protection.canExport) e.preventDefault(); }} onDragStart={e => { if (!protection.selectable) e.preventDefault(); }}>
       {protection.watermarked && <div className="letter-watermark" aria-hidden="true">{Array.from({ length: 24 }, (_, i) => <span key={i}>منصة سهل - مسودة غير مدفوعة</span>)}</div>}
       <p className="text-lg mb-6">{labels.basmala}</p>
       <p className="font-medium mb-4">{letter.addressee}</p>
       <p className="mb-4"><strong>{labels.subject}:</strong> {letter.subject}</p>
       <p className="mb-4">{letter.greeting}</p>
       {letter.body.map((p, i) => <p key={i} className="mb-4">{p}</p>)}<p className="mb-8">{letter.closing}</p>
+      {!!letter.attachments?.length && <section className="document-attachments" aria-label={labels.attachments}><p className="font-semibold">{labels.attachments}:</p><ul>{letter.attachments.map((a, i) => <li key={i}>{a}</li>)}</ul></section>}
       <div className="document-signature">{signatureLines(letter).map(line => <p key={line}>{line}</p>)}<p className="mt-4">{labels.signature}:</p><div className="document-signature-space" /></div>
       {letter.official_stamp && <div className="document-official-space" aria-label="مكان الختم والتوقيع الرسمي"><div><p>{labels.officialSignature}</p><div className="document-signature-space" /></div><div><p>{labels.stamp}</p><div className="document-stamp-space" /></div></div>}
       {letter.witnesses && <section className="document-witnesses" aria-label="الشهود / المعرّفون"><p className="font-semibold mb-3">{labels.witnesses}</p><div className="document-witness-grid">{[0, 1].map(index => <div key={index}>{witnessLines(letter).slice(index * 4, index * 4 + 4).map((line, i) => <p key={i}>{line}</p>)}<div className="document-signature-space" /></div>)}</div></section>}
+      {pages.total > 1 && Array.from({ length: pages.total }, (_, i) => <div key={i}>
+        {i > 0 && <div className="document-page-break" style={{ top: i * pages.height }} aria-hidden="true" />}
+        <p className="document-page-number" style={{ top: (i + 1) * pages.height }}>{pageLabel(i + 1, pages.total, letter.language)}</p>
+      </div>)}
     </article>
     {!unlocked && <div className="flex flex-col items-center gap-3 py-3">
       <div className="flex items-center gap-2"><LockKeyhole className="w-5 h-5" /><p className="font-semibold">المعروض جاهز</p></div>

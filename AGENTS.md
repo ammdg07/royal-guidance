@@ -8,4 +8,4 @@
 - Authenticated owners can read full unpaid drafts with a client watermark; export controls remain payment-gated and unlock endpoints fail closed without verified merchant payments. Watermarks and selection blocking are deterrents, not content secrecy.
 - The application enforces one appearance independent of stored profile theme preferences so all accounts see the same design.
 - Account settings and histories are owned by authenticated users under RLS; clients cannot grant themselves paid access.
-- The application uses visualViewport height for its fixed shell so the composer remains visible when mobile keyboards open.
+- The application uses visualViewport height for its fixed shell so the composer remains visible when mobile keyboards open.- Protocol honorifics, tone checks and attachment validation live in a shared rules module used by both the form and the server so suggestions match generated letters.

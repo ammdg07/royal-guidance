@@ -13,14 +13,26 @@ export interface LetterData {
   official_stamp?: boolean;
   witnesses?: boolean;
   language?: "ar" | "en";
+  attachments?: string[];
 }
 
 export function letterLabels(letter: LetterData) {
   return letter.language === "en" ? {
-    basmala: "In the name of Allah, the Most Gracious, the Most Merciful", subject: "Subject", sender: "Submitted by", id: "National ID", contact: "Contact", date: "Date", signature: "Signature", officialSignature: "Official signature", stamp: "Official stamp", witnesses: "Witnesses / Identifiers", witness: "Witness / Identifier", name: "Name",
+    basmala: "In the name of Allah, the Most Gracious, the Most Merciful", subject: "Subject", sender: "Submitted by", id: "National ID", contact: "Contact", date: "Date", signature: "Signature", officialSignature: "Official signature", stamp: "Official stamp", witnesses: "Witnesses / Identifiers", witness: "Witness / Identifier", name: "Name", attachments: "Attachments",
   } : {
-    basmala: "بسم الله الرحمن الرحيم", subject: "الموضوع", sender: "مقدمه", id: "رقم الهوية", contact: "التواصل", date: "التاريخ", signature: "التوقيع", officialSignature: "التوقيع الرسمي", stamp: "الختم الرسمي", witnesses: "الشهود / المعرّفون", witness: "الشاهد / المعرّف", name: "الاسم",
+    basmala: "بسم الله الرحمن الرحيم", subject: "الموضوع", sender: "مقدمه", id: "رقم الهوية", contact: "التواصل", date: "التاريخ", signature: "التوقيع", officialSignature: "التوقيع الرسمي", stamp: "الختم الرسمي", witnesses: "الشهود / المعرّفون", witness: "الشاهد / المعرّف", name: "الاسم", attachments: "المرفقات",
   };
+}
+
+export function pageLabel(page: number, total: number, language?: "ar" | "en"): string {
+  if (language === "en") return `Page ${page} of ${total}`;
+  const n = (v: number) => v.toLocaleString("ar-SA-u-nu-arab");
+  return `صفحة ${n(page)} من ${n(total)}`;
+}
+
+export function attachmentLines(letter: LetterData): string[] {
+  const items = (letter.attachments || []).map(a => a.trim()).filter(Boolean);
+  return items.length ? [`${letterLabels(letter).attachments}:`, ...items.map(a => `• ${a}`)] : [];
 }
 
 export function witnessLines(letter: LetterData): string[] {
@@ -42,10 +54,11 @@ export function signatureLines(letter: LetterData): string[] {
 
 export function letterToText(letter: LetterData): string {
   const labels = letterLabels(letter);
+  const attachments = attachmentLines(letter);
   return [
     labels.basmala, "", letter.addressee, "",
     `${labels.subject}: ${letter.subject}`, "", letter.greeting, "",
-    ...letter.body, "", letter.closing, "", ...signatureLines(letter),
+    ...letter.body, "", letter.closing, "", ...(attachments.length ? [...attachments, ""] : []), ...signatureLines(letter),
     "", `${labels.signature}: ________________`,
     ...(letter.official_stamp ? ["", `${labels.officialSignature}: ________________`, `${labels.stamp}: ________________`] : []),
     ...witnessLines(letter),
