@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { SHLLogo } from "./SHLLogo";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
+import { WhySHL } from "./WhySHL";
 
 export function AuthScreen() {
   const [signup, setSignup] = useState(false);
@@ -38,6 +39,7 @@ export function AuthScreen() {
       </nav>
     </div></header>
     <section className="mx-auto max-w-2xl px-5 pt-8 pb-3 text-center"><h1 className="text-2xl font-semibold">منصة سهل</h1><p className="mt-3 text-base leading-8 text-muted-foreground">منصة ذكية لصياغة المعاريض والخطابات الرسمية الموجّهة للجهات الحكومية والخاصة بدقة وسرعة.</p></section>
+    <div className="mx-auto max-w-2xl px-5 py-3"><WhySHL /></div>
     <main className="flex items-center justify-center p-5 pb-10">
     <section className="w-full max-w-sm space-y-6">
       <div className="flex justify-center"><SHLLogo size="lg" /></div>

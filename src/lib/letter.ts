@@ -11,24 +11,43 @@ export interface LetterData {
   sender_date?: string;
   notes?: string;
   official_stamp?: boolean;
+  witnesses?: boolean;
+  language?: "ar" | "en";
+}
+
+export function letterLabels(letter: LetterData) {
+  return letter.language === "en" ? {
+    basmala: "In the name of Allah, the Most Gracious, the Most Merciful", subject: "Subject", sender: "Submitted by", id: "National ID", contact: "Contact", date: "Date", signature: "Signature", officialSignature: "Official signature", stamp: "Official stamp", witnesses: "Witnesses / Identifiers", witness: "Witness / Identifier", name: "Name",
+  } : {
+    basmala: "بسم الله الرحمن الرحيم", subject: "الموضوع", sender: "مقدمه", id: "رقم الهوية", contact: "التواصل", date: "التاريخ", signature: "التوقيع", officialSignature: "التوقيع الرسمي", stamp: "الختم الرسمي", witnesses: "الشهود / المعرّفون", witness: "الشاهد / المعرّف", name: "الاسم",
+  };
+}
+
+export function witnessLines(letter: LetterData): string[] {
+  if (!letter.witnesses) return [];
+  const labels = letterLabels(letter);
+  return [1, 2].flatMap(number => [`${labels.witness} ${number}`, `${labels.name}: ________________`, `${labels.id}: ________________`, `${labels.signature}: ________________`]);
 }
 
 export function signatureLines(letter: LetterData): string[] {
   const value = (field?: string) => field?.trim() || "________________";
+  const labels = letterLabels(letter);
   return [
-    `${letter.sender_label || "مقدمه"}: ${value(letter.sender_name)}`,
-    ...(letter.sender_id?.trim() ? [`رقم الهوية: ${letter.sender_id.trim()}`] : []),
-    `التواصل: ${value(letter.sender_mobile)}`,
-    `التاريخ: ${value(letter.sender_date)}`,
+    `${letter.language === "en" ? labels.sender : letter.sender_label || labels.sender}: ${value(letter.sender_name)}`,
+    ...(letter.sender_id?.trim() ? [`${labels.id}: ${letter.sender_id.trim()}`] : []),
+    `${labels.contact}: ${value(letter.sender_mobile)}`,
+    `${labels.date}: ${value(letter.sender_date)}`,
   ];
 }
 
 export function letterToText(letter: LetterData): string {
+  const labels = letterLabels(letter);
   return [
-    "بسم الله الرحمن الرحيم", "", letter.addressee, "",
-    `الموضوع: ${letter.subject}`, "", letter.greeting, "",
+    labels.basmala, "", letter.addressee, "",
+    `${labels.subject}: ${letter.subject}`, "", letter.greeting, "",
     ...letter.body, "", letter.closing, "", ...signatureLines(letter),
-    "", "التوقيع: ________________",
-    ...(letter.official_stamp ? ["", "التوقيع الرسمي: ________________", "الختم الرسمي: ________________"] : []),
+    "", `${labels.signature}: ________________`,
+    ...(letter.official_stamp ? ["", `${labels.officialSignature}: ________________`, `${labels.stamp}: ________________`] : []),
+    ...witnessLines(letter),
   ].join("\n");
 }
