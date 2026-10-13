@@ -224,8 +224,6 @@
   .document-attachments { margin-top: auto; padding-top: 1.5rem; font-size: 15px; break-inside: avoid; }
   .document-attachments + .document-signature { margin-top: 0; }
   .document-attachments ul { list-style: disc; padding-inline-start: 1.5rem; }
-  .document-page-number { position: absolute; inset-inline: 0; transform: translateY(-100%); padding-bottom: 6mm; text-align: center; font-size: 12px; color: hsl(var(--paper-ink) / 0.6); pointer-events: none; }
-  .document-page-break { position: absolute; inset-inline: 0; border-top: 1px dashed hsl(var(--paper-line)); pointer-events: none; }
   .document-witness-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
   @media (max-width: 640px) { .document-witness-grid { grid-template-columns: minmax(0, 1fr); } }
 

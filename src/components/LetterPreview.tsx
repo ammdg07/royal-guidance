@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Copy, Download, LockKeyhole, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { letterToText, signatureLines, letterLabels, witnessLines, pageLabel, type LetterData } from "@/lib/letter";
+import { letterToText, signatureLines, letterLabels, witnessLines, type LetterData } from "@/lib/letter";
 import { letterProtection } from "@/lib/letter-protection";
 
 export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlocked = false, onUnlock }: {
@@ -14,22 +14,10 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
   const [order, setOrder] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
-  const [pages, setPages] = useState({ total: 1, height: 0 });
   const protection = letterProtection(unlocked);
   const labels = letterLabels(letter);
   const paper = useRef<HTMLElement>(null);
-  const content = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = paper.current;
-    if (!el) return;
-    const measure = () => {
-      const height = el.offsetWidth * 297 / 210;
-      setPages({ total: Math.max(1, Math.ceil(el.scrollHeight / height - 0.01)), height });
-    };
-    measure();
-    const observer = new ResizeObserver(measure); observer.observe(el);
-    return () => observer.disconnect();
-  }, [letter]);
+
 
   const confirm = async () => {
     setBusy(true); setStatus("");
@@ -58,7 +46,6 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
       const canvas = await html2canvas(paper.current, { scale: 2, backgroundColor: null, onclone: doc => {
         const element = doc.querySelector<HTMLElement>(`[data-letter-id="${letterId}"]`);
         if (element) { element.style.width = "794px"; element.style.maxWidth = "none"; element.style.minHeight = "1123px"; element.style.padding = "76px 68px"; element.style.fontSize = "18px"; }
-        doc.querySelectorAll(".document-page-number, .document-page-break").forEach(node => node.remove());
       } });
       const document = new jsPDF({ unit: "mm", format: "a4" });
       const pagePixels = Math.floor(canvas.width * 297 / 210);
@@ -72,14 +59,10 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
         if (ctx) {
           ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, slice.width, slice.height);
           ctx.drawImage(canvas, 0, offset, canvas.width, Math.min(pagePixels, canvas.height - offset), 0, 0, canvas.width, Math.min(pagePixels, canvas.height - offset));
-          if (total > 1) {
-            ctx.fillStyle = "#666666"; ctx.textAlign = "center"; ctx.direction = letter.language === "en" ? "ltr" : "rtl";
-            ctx.font = `${Math.round(canvas.width / 794 * 13)}px 'IBM Plex Sans Arabic', Arial, sans-serif`;
-            ctx.fillText(pageLabel(page + 1, total, letter.language), slice.width / 2, slice.height - canvas.width / 794 * 28);
-          }
         }
         document.addImage(slice.toDataURL("image/png"), "PNG", 0, 0, 210, 297);
       }
+
       document.save("SHL-letter.pdf");
     } catch { setStatus("تعذّر تنزيل PDF. حاول مجدداً."); } finally { setBusy(false); }
   };
