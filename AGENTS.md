@@ -1,4 +1,5 @@
 # Architecture rules
+- Pricing plan display data lives in a shared catalog consumed by the pricing dialog; purchase actions stay unavailable without merchant links, and display metadata never grants entitlements.
 - Letter generation returns structured sender fields alongside the letter sections; the preview and clipboard share a signature formatter so supplied details remain consistent.
 - Required letter forms are validated server-side and sender values are assigned deterministically after generation to avoid model omissions.
 - Letter dates are assigned by the shared server date formatter with explicit calendars and Riyadh timezone, keeping the saved preview and exports consistent.
