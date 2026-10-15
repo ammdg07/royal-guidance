@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
-import { Copy, Download, LockKeyhole, ShoppingBag } from "lucide-react";
+import { Copy, Download, LockKeyhole } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { letterToText, signatureLines, letterLabels, witnessLines, type LetterData } from "@/lib/letter";
 import { letterProtection } from "@/lib/letter-protection";
+import { PricingModal } from "./PricingModal";
 
 export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlocked = false, onUnlock }: {
   letter: LetterData; letterId: string; unlocked?: boolean; onUnlock: () => void;
@@ -66,7 +67,6 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
       document.save("SHL-letter.pdf");
     } catch { setStatus("تعذّر تنزيل PDF. حاول مجدداً."); } finally { setBusy(false); }
   };
-  const purchase = () => setStatus("روابط متجر سلة لم تُضف بعد؛ الشراء غير متاح حالياً.");
   return <div className="w-full min-w-0 space-y-3">
     <article ref={paper} data-letter-id={letterId} className={`document-paper${letter.language === "en" ? " document-english" : ""}${protection.selectable ? "" : " document-unpaid"}`} dir={letter.language === "en" ? "ltr" : "rtl"} lang={letter.language || "ar"} aria-label="معاينة الخطاب" onCopy={e => { if (!protection.canExport) e.preventDefault(); }} onCut={e => { if (!protection.canExport) e.preventDefault(); }} onDragStart={e => { if (!protection.selectable) e.preventDefault(); }}>
       {protection.watermarked && <div className="letter-watermark" aria-hidden="true">{Array.from({ length: 24 }, (_, i) => <span key={i}>منصة سهل - مسودة غير مدفوعة</span>)}</div>}
@@ -85,8 +85,7 @@ export function LetterPreview({ letter: initial, letterId, unlocked: initialUnlo
     {!unlocked && <div className="flex flex-col items-center gap-3 py-3">
       <div className="flex items-center gap-2"><LockKeyhole className="w-5 h-5" /><p className="font-semibold">المعروض جاهز</p></div>
       <div className="flex w-full flex-col gap-2 sm:flex-row">
-        <Button variant="premium" className="min-h-12 flex-1 whitespace-normal" onClick={purchase}><ShoppingBag className="w-4 h-4 shrink-0" />شراء وفك قفل المعروض</Button>
-        <Button variant="outline" className="min-h-12 flex-1 whitespace-normal" onClick={purchase}>الاشتراك الشهري غير المحدود</Button>
+        <PricingModal label="عرض الباقات وخيارات الدفع" />
       </div>
     </div>}
     {!unlocked && <form onSubmit={e => { e.preventDefault(); if (order.trim()) confirm(); }} className="space-y-2">
