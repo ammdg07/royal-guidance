@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { SHLLogo } from "./SHLLogo";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccount } from "@/hooks/use-account";
+import { PricingModal } from "./PricingModal";
 interface Item { id: string; title: string; created_at: string; kind: "letter" | "conversation"; unlocked?: boolean }
 export function ChatSidebar({ onClose, onNew, onSettings, onSelect, refresh }: {
   onClose: () => void; onNew: () => void; onSettings: () => void; onSelect: (item: Item) => void; refresh: number;
@@ -40,6 +41,6 @@ export function ChatSidebar({ onClose, onNew, onSettings, onSelect, refresh }: {
       {groups.map(group => { const list = items.filter(i => group.matches(i) && i.title.includes(search)); return list.length ? <section key={group.label}><h2 className="text-xs text-muted-foreground mb-2">{group.label}</h2>{list.map(i => <div key={i.id} className="flex items-center gap-1 mb-1"><Button variant="ghost" onClick={() => onSelect(i)} className="flex-1 min-w-0 min-h-12 justify-start text-right">{i.kind === "letter" ? <FileText className="w-4 h-4 shrink-0" /> : <MessageSquare className="w-4 h-4 shrink-0" />}<span className="truncate">{i.title}</span>{i.unlocked && <span className="text-primary text-xs">مفتوح</span>}</Button><Button aria-label="حذف نهائياً" variant="ghost" size="icon" onClick={() => remove(i)} className="min-w-12 min-h-12 shrink-0"><Trash2 className="w-4 h-4" /></Button></div>)}</section> : null; })}
       {!items.length && <p className="text-sm text-muted-foreground">لا يوجد سجل بعد.</p>}{error && <p role="status" className="text-sm text-accent">{error}</p>}
     </div>
-    <div className="p-3 border-t border-border"><Button variant="ghost" onClick={onSettings} className="min-h-12 w-full"><Settings className="w-4 h-4" />الإعدادات</Button></div>
+    <div className="p-3 border-t border-border grid gap-2"><PricingModal /><Button variant="ghost" onClick={onSettings} className="min-h-12 w-full"><Settings className="w-4 h-4" />الإعدادات</Button></div>
   </aside>;
 }

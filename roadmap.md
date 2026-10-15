@@ -1,4 +1,5 @@
 # Current tasks
+- [x] Add pricing dialog with individual/institutional fixed-term Salla plan descriptions; plain logo-free paper retained, 33 tests pass and both tabs verified on desktop/mobile. Unimplemented plan benefits explicitly marked as in preparation; purchase remains unavailable.
 - [x] Add the Why SHL introduction, ready-letter revision, language and legal-support options, and two-witness spaces; verified authenticated English revision, saved-letter readback, export gating and 20 tests. Legal citations fall back safely when official text cannot be retrieved.
 - [x] Add public header login/signup actions and a concise platform introduction; verified form switching.
 - [x] Add optional recipient person/title and official stamp/signature space; verified real generation and mobile preview.
@@ -13,5 +14,5 @@
 - [x] Replace blur with readable watermarked drafts and payment-gated exports; verified real authenticated generation and mobile preview.
 - [x] Remove appearance switching and enforce a unified formal dark theme; verified account settings.
 - [x] Add automatic honorifics, attachments list, tone checker, cover-letter template and page numbering; 25 tests pass.
-- [ ] Connect the paid store platform and add purchase links plus automatic paid-order verification — blocked on the user choosing the platform (Salla or another) and supplying product/subscription links and API access.
+- [ ] Connect Salla purchase links and automatic paid-order verification — blocked on the user supplying individual/institutional product links and merchant API access.
 - [ ] Verify paid unlock end-to-end — blocked on the store platform connection; authenticated generation, watermarked preview and settings verified.
